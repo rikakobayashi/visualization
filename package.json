@@ -1,0 +1,26 @@
+{
+  "name": "Visualization_webpack",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "webpack",
+    "start": "webpack serve --mode development --env development"
+  },
+  "devDependencies": {
+    "html-loader": "^1.3.2",
+    "html-webpack-plugin": "^4.5.0",
+    "ts-loader": "^8.0.7",
+    "typescript": "^4.0.5",
+    "webpack": "^5.3.2",
+    "webpack-cli": "^4.1.0",
+    "webpack-dev-server": "^3.11.0"
+  },
+  "dependencies": {
+    "@types/d3": "^3.5.34",
+    "@types/d3-sankey": "^0.11.1",
+    "d3": "3.5.17",
+    "d3-sankey": "^0.12.3",
+    "global": "^4.4.0"
+  }
+}

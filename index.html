@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>sample</title>
+    <style>
+      .node0 rect {
+        cursor: move;
+        fill-opacity: 0.9;
+        shape-rendering: crispEdges;
+      }
+
+      .node0 text {
+        pointer-events: none;
+        text-shadow: 0 1px 0 #fff;
+      }
+
+      .link0 {
+        fill: none;
+        stroke: red;
+        stroke-opacity: 0.2;
+      }
+
+      .link0:hover {
+        stroke-opacity: 0.5;
+      }
+
+      /* .link1:hover {
+        stroke-opacity: 5;
+      }
+
+      .link2:hover {
+        stroke-opacity: 5;
+      } */
+      .node {
+        stroke: #fff;
+        stroke-width: 0.1px;
+      }
+      .info {
+        stroke: #fff;
+        stroke-width: 0.1px;
+        font-size: 4px;
+      }
+      .link {
+        stroke: black;
+        stroke-opacity: 10;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      const a = 1;
+    </script>
+    <p id="chart"></p>
+    <h2>Clinical Pathways</h2>
+    <h3>操作</h3>
+    <p>オーダーダブルクリック : 詳細情報の表示</p>
+    <p>オーダークリック : 詳細情報の非表示</p>
+    <p>安全性</p>
+    <button id="displayRisk1">併発症発生リスク</button>
+    <button id="displayRisk2">重篤度を考慮したリスク</button>
+    <p>効率性</p>
+    <button id="displayCost1">在院日数</button>
+    <button id="displayCost2">費用</button>
+    <p><button id="clearButton">全ての詳細情報の非表示</button></p>
+    <!-- <script src="index.js"></script> -->
+  </body>
+</html>

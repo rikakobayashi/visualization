@@ -1,0 +1,225 @@
+{
+  "order_all": [
+    [
+      {
+        "id": 0,
+        "order_type": "start",
+        "order_explain": "start",
+        "order_name": "",
+        "code": "",
+        "day": "-1",
+        "next_item_id": [1]
+      }
+    ],
+    [
+      {
+        "id": 1,
+        "order_type": "服薬指導",
+        "order_explain": "薬剤管理指導料３",
+        "order_name": "",
+        "code": "",
+        "day": "-1",
+        "next_item_id": [2, 3]
+      }
+    ],
+    [
+      {
+        "id": 2,
+        "order_type": "group1",
+        "order_explain": "血液型関連検査, 検体検査, クロスマッチ（Ｔ＆Ｓ）検査",
+        "order_name": "",
+        "code": "",
+        "day": "",
+        "next_item_id": [4],
+        "isGroup": true
+      },
+      {
+        "id": 3,
+        "order_type": "group2",
+        "order_explain": "検体検査, クロスマッチ（Ｔ＆Ｓ）検査",
+        "order_name": "",
+        "code": "",
+        "day": "",
+        "next_item_id": [4],
+        "isGroup": true
+      }
+    ],
+    [
+      {
+        "id": 4,
+        "order_type": "処方",
+        "order_explain": "外用薬剤",
+        "order_name": "グリセリン浣腸「オヲタ」",
+        "code": "235",
+        "day": "0",
+        "next_item_id": [5]
+      }
+    ],
+    [
+      {
+        "id": 5,
+        "order_type": "手術麻酔",
+        "order_explain": "閉鎖循環式全身麻酔",
+        "order_name": "",
+        "code": "",
+        "day": "0",
+        "next_item_id": [6]
+      }
+    ],
+    [
+      {
+        "id": 6,
+        "order_type": "手術",
+        "order_explain": "膀胱悪性腫瘍手術",
+        "order_name": "",
+        "code": "",
+        "day": "0",
+        "next_item_id": [7]
+      }
+    ],
+    [
+      {
+        "id": 7,
+        "order_type": "group3",
+        "order_explain": "start",
+        "order_name": "",
+        "code": "",
+        "day": "",
+        "next_item_id": [8],
+        "isGroup": true
+      }
+    ],
+    [
+      {
+        "id": 8,
+        "order_type": "注射群",
+        "order_explain": "",
+        "order_name": "",
+        "code": "",
+        "day": "",
+        "next_item_id": [-1]
+      }
+    ]
+  ],
+  "Risk1": [
+    {
+      "seq": 1,
+      "value": 0.175
+    },
+    {
+      "seq": 2,
+      "value": 0.091
+    }
+  ],
+  "Risk2": [
+    {
+      "seq": 1,
+      "value": 6.94
+    },
+    {
+      "seq": 2,
+      "value": 7.44
+    }
+  ],
+  "Cost1": [
+    {
+      "seq": 1,
+      "value": 8.08
+    },
+    {
+      "seq": 2,
+      "value": 7.95
+    }
+  ],
+  "Cost2": [
+    {
+      "seq": 1,
+      "value": 6600000
+    },
+    {
+      "seq": 2,
+      "value": 4290000
+    }
+  ],
+  "Pnum": [
+    {
+      "seq": 1,
+      "value": 63
+    },
+    {
+      "seq": 2,
+      "value": 55
+    }
+  ],
+  "Statistics": {
+    "value": {
+      "IRP": 0.28,
+      "SRP": 0.25,
+      "LOSP": 0.64,
+      "COSTP": 0.0012
+    },
+    "result": {
+      "IRSD": "有意差なし",
+      "SRSD": "有意差なし",
+      "LOSSD": "有意差なし",
+      "COSTSD": "有意差あり"
+    }
+  },
+  "groups": {
+    "group1": [
+      {
+        "order_type": "血液型関連検査",
+        "order_explain": "ＡＢＯ式血液型",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      },
+      {
+        "order_type": "検体検査",
+        "order_explain": "総蛋白",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      },
+      {
+        "order_type": "クロスマッチ（Ｔ＆Ｓ）検査",
+        "order_explain": "Ｔ＆Ｓ検査",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      }
+    ],
+    "group2": [
+      {
+        "order_type": "検体検査",
+        "order_explain": "総蛋白",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      },
+      {
+        "order_type": "クロスマッチ（Ｔ＆Ｓ）検査",
+        "order_explain": "Ｔ＆Ｓ検査",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      }
+    ],
+    "group3": [
+      {
+        "order_type": "緊急検査",
+        "order_explain": "ＷＢＣ",
+        "order_name": "",
+        "code": "",
+        "day": "0"
+      },
+      {
+        "order_type": "病理診断",
+        "order_explain": "Ｔ−Ｍ",
+        "order_name": "",
+        "code": "",
+        "day": "0"
+      }
+    ]
+  }
+}
