@@ -6,13 +6,11 @@ import data from "../dist/data.json";
 const Data: JSONDataType = data;
 
 interface JSONDataType {
-  order_all: OrderDataType[][];
+  order_all: OrderDataType[];
   Risk1: RiskType[];
   Risk2: RiskType[];
   Cost1: RiskType[];
   Cost2: RiskType[];
-  // order1: OrderType[][];
-  // order2: OrderType[][];
   Pnum: RiskType[];
   Statistics: StatisticsType;
   groups: { [key: string]: GroupOrderDataType[] };
@@ -63,6 +61,7 @@ type StatisticsType = {
 };
 
 interface PlaceType {
+  id: number;
   r_x: number;
   r_y: number;
 }
@@ -86,7 +85,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
   const link_length = 203; //文字が重なる場合はここの値を変更
   const margin = 110; // 全体が入るようにノードを右にずらす
   const width = N1 * (link_length + circle_r);
-  const height = 500;
+  const height = 600;
   const rect_x = 0;
   const rect_y = 0;
   const info_x = 0;
@@ -127,124 +126,88 @@ d3.json("data.json", function (error, data: JSONDataType) {
   let max_order_length = 0;
   let height_s = 0;
 
-  data.order_all.forEach((orders_by_seq, seq_index) => {
-    orders_by_seq.forEach((order, order_index) => {
-      // ordersを定義
-      if (order.isGroup) {
-        // groupがある時
-        console.log(order.order_type);
-        console.log(data.groups[order.order_type]);
-        data.groups[order.order_type].forEach((_order, index) => {
-          // graph.ordersを定義
-          graph.orders.push({
-            ..._order,
-            id: order.id,
-            next_item_id: order.next_item_id,
-            r_x: seq_index * link_length + margin,
-            r_y:
-              push_place(
-                orders_by_seq.length,
-                order_index,
-                data.groups[order.order_type].length
-              ) -
-              (60 * (data.groups[order.order_type].length - 1)) / 2 +
-              60 * index,
-          });
-        });
-        // placeを定義
-        place.push({
-          r_x: seq_index * link_length + margin,
-          r_y: push_place(
-            orders_by_seq.length,
-            order_index,
-            data.groups[order.order_type].length
-          ),
-        });
-      } else {
+  const push_graph_orders = (
+    id: number,
+    seq_number: number,
+    seq_length: number,
+    seq_index: number
+  ): void => {
+    if (id == -1) return;
+    const order = data.order_all.find((order) => order.id == id);
+    if (!order) return;
+    if (graph.orders.find((order) => order.id == id)) return;
+    if (order.isGroup) {
+      data.groups[order.order_type].forEach((_order, index) => {
+        // 各オーダーが通る座標
         graph.orders.push({
-          ...order,
-          r_x: seq_index * link_length + margin,
-          r_y: push_place(orders_by_seq.length, order_index),
+          ..._order,
+          id: order.id,
+          next_item_id: order.next_item_id,
+          r_x: seq_number * link_length + margin,
+          r_y:
+            push_place(
+              seq_length,
+              seq_index,
+              data.groups[order.order_type].length
+            ) -
+            (60 * (data.groups[order.order_type].length - 1)) / 2 +
+            60 * index,
         });
-        // placeを定義
-        place.push({
-          r_x: seq_index * link_length + margin,
-          r_y: push_place(orders_by_seq.length, order_index),
-        });
-      }
-      if (order.next_item_id[0] !== -1) {
-        // graph2.nodes.push(order);
-        // linksとa_lineを定義
-        order.next_item_id.forEach((id) => {
-          graph.links.push({
-            source: order.id,
-            target: id,
-            value: 40,
-          });
-          // graph2.links.push({
-          //   source: order.id,
-          //   target: id,
-          //   value: 20,
-          // });
-          // graph2.links.push({
-          //   source: order.id,
-          //   target: id,
-          //   value: 1,
-          // });
-          // a_line
-          a_line.push({
-            source: order.id,
-            target: id,
-          });
-        });
-      }
-
-      // パス1について
-      // data.order1[seq_index].forEach((order1, order1_index) => {
-      //   if (JSON.stringify(order) == JSON.stringify(order1)) {
-      //     graph3.nodes.push(order1);
-      //     place2.push({
-      //       r_x: seq_index * link_length + margin,
-      //       r_y: push_place(orders_by_seq.length, order_index),
-      //     });
-      //     if (seq_index < data.order1.length - 1) {
-      //       a_line2.push({
-      //         source: seq_index,
-      //         target: graph3.nodes.length,
-      //       });
-      //     }
-      //   }
-      // });
-
-      // パス2について
-      // data.order2[seq_index].forEach((order2, order2_index) => {
-      //   if (JSON.stringify(order) == JSON.stringify(order2)) {
-      //     graph4.nodes.push(order2);
-      //     place3.push({
-      //       r_x: seq_index * link_length + margin,
-      //       r_y: push_place(orders_by_seq.length, order_index),
-      //     });
-      //     if (seq_index < data.order2.length - 1) {
-      //       // graph4.links.push({
-      //       //   source: seq_index,
-      //       //   target: graph4.nodes.length,
-      //       //   value: data.Pnum[1].value,
-      //       // });
-      //       a_line3.push({
-      //         source: seq_index,
-      //         target: graph4.nodes.length,
-      //       });
-      //     }
-      //   }
-      // });
-    });
-    // height_sを定義
-    if (max_order_length < orders_by_seq.length) {
-      height_s =
-        push_place(orders_by_seq.length, 0) -
-        push_place(orders_by_seq.length, orders_by_seq.length);
-      max_order_length = orders_by_seq.length;
+      });
+      // パスが通る座標
+      place.push({
+        id: order.id,
+        r_x: seq_number * link_length + margin,
+        r_y: push_place(
+          seq_length,
+          seq_index,
+          data.groups[order.order_type].length
+        ),
+      });
+    } else {
+      graph.orders.push({
+        ...order,
+        r_x: seq_number * link_length + margin,
+        r_y: push_place(seq_length, seq_index),
+      });
+      place.push({
+        id: order.id,
+        r_x: seq_number * link_length + margin,
+        r_y: push_place(seq_length, seq_index),
+      });
     }
+    order.next_item_id.forEach((next_item_id, next_index) => {
+      push_graph_orders(
+        next_item_id,
+        seq_number + 1,
+        order.next_item_id.length,
+        next_index
+      );
+    });
+  };
+
+  data.order_all.forEach((orders_by_seq, seq_index) => {
+    push_graph_orders(0, 0, 1, 1);
+
+    if (orders_by_seq.next_item_id[0] !== -1) {
+      // linksを定義
+      orders_by_seq.next_item_id.forEach((id) => {
+        graph.links.push({
+          source: orders_by_seq.id,
+          target: id,
+          value: 40,
+        });
+      });
+    }
+
+    // height_sを定義
+    // if (max_order_length < orders_by_seq.length) {
+    //   height_s =
+    //     push_place(orders_by_seq.length, 0) -
+    //     push_place(orders_by_seq.length, orders_by_seq.length);
+    //   max_order_length = orders_by_seq.length;
+    // }
+    height_s = 800;
   });
 
   console.log(JSON.parse(JSON.stringify(graph)));
@@ -338,13 +301,13 @@ d3.json("data.json", function (error, data: JSONDataType) {
     let curvature = 0.5;
 
     function link(d: LinksType, i: number) {
-      const x0 = pop_place(find_link(i).source).r_x,
-        x1 = pop_place(find_link(i).target).r_x,
+      const x0 = pop_place(find_link(i).source)!.r_x,
+        x1 = pop_place(find_link(i).target)!.r_x,
         xi = d3.interpolateNumber(x0, x1),
         x2 = xi(curvature),
         x3 = xi(1 - curvature),
-        y0 = pop_place(find_link(i).source).r_y,
-        y1 = pop_place(find_link(i).target).r_y;
+        y0 = pop_place(find_link(i).source)!.r_y,
+        y1 = pop_place(find_link(i).target)!.r_y;
       return (
         "M" +
         x0 +
@@ -824,11 +787,11 @@ d3.json("data.json", function (error, data: JSONDataType) {
   }
 
   function pop_place(id: number) {
-    return place[id];
+    return place.find((place) => place.id == id);
   }
 
   function find_link(id: number) {
-    return a_line[id];
+    return graph.links[id];
   }
 
   // function pop_place2(id: number) {
@@ -851,15 +814,15 @@ d3.json("data.json", function (error, data: JSONDataType) {
     //nodeの色の決定
     if (type == "処方") {
       return 1;
-    } else if (type == "生理検査") {
+    } else if (type == "手術麻酔") {
       return 2;
     } else if (type == "検体検査") {
       return 3;
-    } else if (type == "看護タスク") {
+    } else if (type == "緊急検査") {
       return 4;
     } else if (type == "手術") {
       return 5;
-    } else if (type == "注射") {
+    } else if (type == "病理診断") {
       return 6;
     } else if (type == "クロスマッチ（Ｔ＆Ｓ）検査") {
       return 7;

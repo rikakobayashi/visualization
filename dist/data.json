@@ -1,105 +1,89 @@
 {
   "order_all": [
-    [
-      {
-        "id": 0,
-        "order_type": "start",
-        "order_explain": "start",
-        "order_name": "",
-        "code": "",
-        "day": "-1",
-        "next_item_id": [1]
-      }
-    ],
-    [
-      {
-        "id": 1,
-        "order_type": "服薬指導",
-        "order_explain": "薬剤管理指導料３",
-        "order_name": "",
-        "code": "",
-        "day": "-1",
-        "next_item_id": [2, 3]
-      }
-    ],
-    [
-      {
-        "id": 2,
-        "order_type": "group1",
-        "order_explain": "血液型関連検査, 検体検査, クロスマッチ（Ｔ＆Ｓ）検査",
-        "order_name": "",
-        "code": "",
-        "day": "",
-        "next_item_id": [4],
-        "isGroup": true
-      },
-      {
-        "id": 3,
-        "order_type": "group2",
-        "order_explain": "検体検査, クロスマッチ（Ｔ＆Ｓ）検査",
-        "order_name": "",
-        "code": "",
-        "day": "",
-        "next_item_id": [4],
-        "isGroup": true
-      }
-    ],
-    [
-      {
-        "id": 4,
-        "order_type": "処方",
-        "order_explain": "外用薬剤",
-        "order_name": "グリセリン浣腸「オヲタ」",
-        "code": "235",
-        "day": "0",
-        "next_item_id": [5]
-      }
-    ],
-    [
-      {
-        "id": 5,
-        "order_type": "手術麻酔",
-        "order_explain": "閉鎖循環式全身麻酔",
-        "order_name": "",
-        "code": "",
-        "day": "0",
-        "next_item_id": [6]
-      }
-    ],
-    [
-      {
-        "id": 6,
-        "order_type": "手術",
-        "order_explain": "膀胱悪性腫瘍手術",
-        "order_name": "",
-        "code": "",
-        "day": "0",
-        "next_item_id": [7]
-      }
-    ],
-    [
-      {
-        "id": 7,
-        "order_type": "group3",
-        "order_explain": "start",
-        "order_name": "",
-        "code": "",
-        "day": "",
-        "next_item_id": [8],
-        "isGroup": true
-      }
-    ],
-    [
-      {
-        "id": 8,
-        "order_type": "注射群",
-        "order_explain": "",
-        "order_name": "",
-        "code": "",
-        "day": "",
-        "next_item_id": [-1]
-      }
-    ]
+    {
+      "id": 0,
+      "order_type": "start",
+      "order_explain": "start",
+      "order_name": "",
+      "code": "",
+      "day": "-1",
+      "next_item_id": [1]
+    },
+    {
+      "id": 1,
+      "order_type": "服薬指導",
+      "order_explain": "薬剤管理指導料３",
+      "order_name": "",
+      "code": "",
+      "day": "-1",
+      "next_item_id": [2, 3]
+    },
+    {
+      "id": 2,
+      "order_type": "group1",
+      "order_explain": "血液型関連検査, 検体検査, クロスマッチ（Ｔ＆Ｓ）検査",
+      "order_name": "",
+      "code": "",
+      "day": "",
+      "next_item_id": [4],
+      "isGroup": true
+    },
+    {
+      "id": 3,
+      "order_type": "group2",
+      "order_explain": "検体検査, クロスマッチ（Ｔ＆Ｓ）検査",
+      "order_name": "",
+      "code": "",
+      "day": "",
+      "next_item_id": [4],
+      "isGroup": true
+    },
+    {
+      "id": 4,
+      "order_type": "処方",
+      "order_explain": "外用薬剤",
+      "order_name": "グリセリン浣腸「オヲタ」",
+      "code": "235",
+      "day": "0",
+      "next_item_id": [5]
+    },
+    {
+      "id": 5,
+      "order_type": "手術麻酔",
+      "order_explain": "閉鎖循環式全身麻酔",
+      "order_name": "",
+      "code": "",
+      "day": "0",
+      "next_item_id": [6]
+    },
+    {
+      "id": 6,
+      "order_type": "手術",
+      "order_explain": "膀胱悪性腫瘍手術",
+      "order_name": "",
+      "code": "",
+      "day": "0",
+      "next_item_id": [7]
+    },
+    {
+      "id": 7,
+      "order_type": "group3",
+      "order_explain": "start",
+      "order_name": "",
+      "code": "",
+      "day": "",
+      "next_item_id": [8],
+      "isGroup": true
+    },
+    {
+      "id": 8,
+      "order_type": "注射群",
+      "order_explain": "",
+      "order_name": "",
+      "code": "",
+      "day": "",
+      "next_item_id": [-1]
+    }
   ],
   "Risk1": [
     {
