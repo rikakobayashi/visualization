@@ -7,6 +7,7 @@
       "order_name": "",
       "code": "",
       "day": "-1",
+      "frequency": 0,
       "next_item_id": [1]
     },
     {
@@ -16,6 +17,7 @@
       "order_name": "",
       "code": "",
       "day": "-1",
+      "frequency": 64,
       "next_item_id": [2, 3]
     },
     {
@@ -26,6 +28,7 @@
       "code": "",
       "day": "",
       "next_item_id": [4],
+      "frequency": 86,
       "isGroup": true
     },
     {
@@ -36,6 +39,7 @@
       "code": "",
       "day": "",
       "next_item_id": [4],
+      "frequency": 83,
       "isGroup": true
     },
     {
@@ -45,6 +49,7 @@
       "order_name": "グリセリン浣腸「オヲタ」",
       "code": "235",
       "day": "0",
+      "frequency": 90,
       "next_item_id": [5]
     },
     {
@@ -54,6 +59,7 @@
       "order_name": "",
       "code": "",
       "day": "0",
+      "frequency": 71,
       "next_item_id": [6]
     },
     {
@@ -63,6 +69,7 @@
       "order_name": "",
       "code": "",
       "day": "0",
+      "frequency": 100,
       "next_item_id": [7]
     },
     {
@@ -73,6 +80,7 @@
       "code": "",
       "day": "",
       "next_item_id": [8],
+      "frequency": 81,
       "isGroup": true
     },
     {
@@ -82,8 +90,30 @@
       "order_name": "",
       "code": "",
       "day": "",
+      "frequency": 93,
       "next_item_id": [-1]
     }
+  ],
+  "recommend": [
+    { "source": 0, "target": 1, "value": 35 },
+    {
+      "source": 1,
+      "target": 2,
+      "value": 72,
+      "factor": "入院歴なし"
+    },
+    {
+      "source": 1,
+      "target": 3,
+      "value": 65,
+      "factor": "入院歴あり"
+    },
+    { "source": 2, "target": 4, "value": 51 },
+    { "source": 3, "target": 4, "value": 33 },
+    { "source": 4, "target": 5, "value": 21 },
+    { "source": 5, "target": 6, "value": 59 },
+    { "source": 6, "target": 7, "value": 25 },
+    { "source": 7, "target": 8, "value": 67 }
   ],
   "Risk1": [
     {

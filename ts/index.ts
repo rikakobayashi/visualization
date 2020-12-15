@@ -7,6 +7,7 @@ const Data: JSONDataType = data;
 
 interface JSONDataType {
   order_all: OrderDataType[];
+  recommend: LinksType[];
   Risk1: RiskType[];
   Risk2: RiskType[];
   Cost1: RiskType[];
@@ -23,6 +24,7 @@ interface OrderDataType {
   order_name: string;
   code: string;
   day: string;
+  frequency: number;
   next_item_id: Array<number>;
   isGroup?: boolean;
 }
@@ -123,8 +125,12 @@ d3.json("data.json", function (error, data: JSONDataType) {
   const Cost = data.Cost2;
   const Statistics = data.Statistics;
 
+  const dataTypes4Color: String[] = [];
+
   let max_order_length = 0;
   let height_s = 0;
+
+  let isRecommend: boolean = true;
 
   const push_graph_orders = (
     id: number,
@@ -142,6 +148,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
         graph.orders.push({
           ..._order,
           id: order.id,
+          frequency: order.frequency,
           next_item_id: order.next_item_id,
           r_x: seq_number * link_length + margin,
           r_y:
@@ -176,6 +183,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
         r_y: push_place(seq_length, seq_index),
       });
     }
+
     order.next_item_id.forEach((next_item_id, next_index) => {
       push_graph_orders(
         next_item_id,
@@ -209,6 +217,41 @@ d3.json("data.json", function (error, data: JSONDataType) {
     // }
     height_s = 800;
   });
+
+  // const test: number[][] = [];
+
+  // const test = data.order_all.reduce(
+  //   (id_array: number[] | number[][], order) => {
+  //     if (id_array.length == 0) {
+  //       return order.next_item_id;
+  //     }
+  //     return id_array.reduce((arr: number[][], id1: number | number[]) => {
+  //       order.next_item_id.forEach((id2) => {
+  //         const group = [id1, id2].flat();
+  //         arr.push(group);
+  //       });
+  //       return arr;
+  //     }, []);
+  //   },
+  //   []
+  // );
+
+  const test2: number[][] = [];
+
+  const findId = (id: number, arr: number[]) => {
+    const targetOrder = data.order_all.find((order) => order.id == id);
+    if (!targetOrder) {
+      return test2.push(arr.concat());
+    }
+    arr.push(id);
+    targetOrder?.next_item_id.forEach((id) => {
+      findId(id, arr.concat());
+    });
+  };
+
+  findId(0, []);
+
+  console.log(test2.concat());
 
   console.log(JSON.parse(JSON.stringify(graph)));
   console.log(JSON.parse(JSON.stringify(place)));
@@ -256,14 +299,14 @@ d3.json("data.json", function (error, data: JSONDataType) {
     Pnumsum += data.Pnum[i].value;
   }
   //Set up the color scale
-  const color = d3.scale.category10();
+  const color = d3.scale.category20();
   const color2 = d3.scale.category20();
-  for (let i = 0; i < 10; i++) {
-    color(String(i));
-  }
-  for (let i = 0; i < 20; i++) {
-    color2(String(i));
-  }
+  // for (let i = 0; i < 10; i++) {
+  //   color(String(i));
+  // }
+  // for (let i = 0; i < 20; i++) {
+  //   color2(String(i));
+  // }
 
   //Append a SVG to the body of the html page. Assign this SVG as an object to svg
   const svg = d3
@@ -452,19 +495,17 @@ d3.json("data.json", function (error, data: JSONDataType) {
                     d.target.order_type + "\n" + format(d.value); }); */
 
   // 上側のパスを出力
-  const link1_data = svg
-    .append("g")
-    .selectAll(".link1")
-    .data(graph.links)
-    .enter();
+  let link1_data = isRecommend
+    ? svg.append("g").selectAll(".link1").data(data.recommend).enter()
+    : svg.append("g").selectAll(".link1").data(graph.links).enter();
   const link1 = link1_data
     .append("path")
     .attr("class", "link1")
-    .attr("d", path1())
-    .attr("stroke", function (d) {
-      const rgb = 255 - 1.2 * d.value;
-      return `rgb(${rgb}, ${rgb}, ${rgb})`;
+    .attr("id", function (d) {
+      return `link${d.source}${d.target}`;
     })
+    .attr("d", path1())
+    .attr("stroke", "#ccc")
     // .attr("stroke-opacity", .7)
     .style("stroke-width", function (d) {
       return Math.max(
@@ -501,6 +542,12 @@ d3.json("data.json", function (error, data: JSONDataType) {
     .append("text")
     .attr("class", "link1_text")
     .attr("font-size", 15)
+    .attr("x", function (d) {
+      return (pop_place(d.source)!.r_x + pop_place(d.target)!.r_x) / 2;
+    })
+    .attr("y", function (d) {
+      return (pop_place(d.source)!.r_y + pop_place(d.target)!.r_y) / 2;
+    })
     .style("text-anchor", "middle")
     .style("dominant-baseline", "central")
     .text(function (d) {
@@ -634,7 +681,9 @@ d3.json("data.json", function (error, data: JSONDataType) {
     });
   node
     .append("circle")
-    .attr("r", circle_r)
+    .attr("r", function (d) {
+      return (d.frequency / 100 + 0.3) * circle_r;
+    })
     .style("fill", function (d, i) {
       return color(String(colorset(d.order_type)));
     })
@@ -643,6 +692,10 @@ d3.json("data.json", function (error, data: JSONDataType) {
     })
     .attr("cy", function (d, i) {
       return d.r_y;
+    })
+    .append("title")
+    .text(function (d) {
+      return `出現率: ${d.frequency}%`;
     });
 
   node
@@ -773,6 +826,22 @@ d3.json("data.json", function (error, data: JSONDataType) {
       return c_line;
     }
 
+    const plact_top = 10;
+
+    // if (isRecommend) {
+    //   if (parallel % 2 == 0) {
+    //     if (j < parallel / 2) return c_line;
+    //     else
+    //       return (
+    //         c_line + 150 - 150 * (parallel / 2 - j) + (group_num ?? 0) * 15
+    //       );
+    //   } else {
+    //     parallel = parallel - 1;
+    //     if (j < parallel / 2) return c_line + 150 + 150 * (j - parallel / 2);
+    //     else return c_line + 150 - 150 * (parallel / 2 - j);
+    //   }
+    // }
+
     if (parallel % 2 == 0) {
       if (j < parallel / 2)
         return c_line + 75 + 150 * (j - parallel / 2) - (group_num ?? 0) * 15;
@@ -812,27 +881,11 @@ d3.json("data.json", function (error, data: JSONDataType) {
 
   function colorset(type: string) {
     //nodeの色の決定
-    if (type == "処方") {
-      return 1;
-    } else if (type == "手術麻酔") {
-      return 2;
-    } else if (type == "検体検査") {
-      return 3;
-    } else if (type == "緊急検査") {
-      return 4;
-    } else if (type == "手術") {
-      return 5;
-    } else if (type == "病理診断") {
-      return 6;
-    } else if (type == "クロスマッチ（Ｔ＆Ｓ）検査") {
-      return 7;
-    } else if (type == "服薬指導") {
-      return 8;
-    } else if (type == "血液型関連検査") {
-      return 9;
-    } else {
-      return 0;
-    }
+    const number =
+      dataTypes4Color.indexOf(type) !== -1
+        ? dataTypes4Color.indexOf(type)
+        : dataTypes4Color.push(type) - 1;
+    return number;
   }
 
   function colorset2(seqno: number) {
@@ -887,6 +940,97 @@ d3.json("data.json", function (error, data: JSONDataType) {
     d3.selectAll(".cost2_ptext").style("visibility", "hidden");
   });
   //---End Insert---
+
+  // d3.select("#changeRecommend").on("click", function () {
+  //   isRecommend = !isRecommend;
+  //   if (isRecommend) {
+  //     d3.select("#changeRecommend").text("推薦ON");
+  //     d3.selectAll(".link1_text").remove();
+  //     link1_data = svg
+  //       .append("g")
+  //       .selectAll(".link1")
+  //       .data(data.recommend)
+  //       .enter();
+  //     link1_data
+  //       .append("text")
+  //       .attr("class", "link1_text")
+  //       .attr("font-size", 15)
+  //       .attr("x", function (d) {
+  //         return (pop_place(d.source)!.r_x + pop_place(d.target)!.r_x) / 2;
+  //       })
+  //       .attr("y", function (d) {
+  //         return (pop_place(d.source)!.r_y + pop_place(d.target)!.r_y) / 2;
+  //       })
+  //       .style("text-anchor", "middle")
+  //       .style("dominant-baseline", "central")
+  //       .text(function (d) {
+  //         if (d.factor) return d.factor;
+  //         return "";
+  //       });
+  //   } else {
+  //     d3.select("#changeRecommend").text("推薦OFF");
+  //     d3.selectAll(".link1_text").remove();
+  //     link1_data = svg
+  //       .append("g")
+  //       .selectAll(".link1")
+  //       .data(graph.links)
+  //       .enter();
+  //     link1_data
+  //       .append("text")
+  //       .attr("class", "link1_text")
+  //       .attr("font-size", 15)
+  //       .attr("x", function (d) {
+  //         return (pop_place(d.source)!.r_x + pop_place(d.target)!.r_x) / 2;
+  //       })
+  //       .attr("y", function (d) {
+  //         return (pop_place(d.source)!.r_y + pop_place(d.target)!.r_y) / 2;
+  //       })
+  //       .style("text-anchor", "middle")
+  //       .style("dominant-baseline", "central")
+  //       .text(function (d) {
+  //         if (d.factor) return d.factor;
+  //         return "";
+  //       });
+  //   }
+  // });
+
+  const branch_orders = data.order_all.filter((order) => {
+    return order.next_item_id.length > 1;
+  });
+
+  const variants: LinksType[][] = [];
+
+  const selection = [];
+
+  branch_orders.forEach((branch_order) => {
+    variants.push(
+      data.recommend.filter((rec_link) => rec_link.source == branch_order.id)
+    );
+  });
+
+  console.log(variants);
+
+  variants.forEach((variant) => {
+    d3.select("#buttons")
+      .selectAll("button")
+      .data(variant)
+      .enter()
+      .append("button")
+      .text(function (d) {
+        return d.factor;
+      })
+      .on("click", function (d) {
+        selection.push(d.factor);
+        d3.selectAll(".link1").attr("stroke", "#ccc");
+        const path = test2.find((ids) => ids.find((id) => id == d.target));
+        path?.forEach((p, i) => {
+          if (!path[i + 1]) return;
+          d3.select(`#link${p}${path[i + 1]}`).attr("stroke", "pink");
+        });
+      });
+  });
+
+  // d3.select("#buttons").
 
   const rect1 = svg
     .append("rect")
