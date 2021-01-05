@@ -7,7 +7,6 @@ const Data: JSONDataType = data;
 
 interface JSONDataType {
   order_all: OrderDataType[];
-  recommend: LinksType[];
   Risk1: RiskType[];
   Risk2: RiskType[];
   Cost1: RiskType[];
@@ -26,6 +25,9 @@ interface OrderDataType {
   day: string;
   frequency: number;
   next_item_id: Array<number>;
+  pre_item_id: Array<number>;
+  factor?: string[];
+  time_interval?: number[];
   isGroup?: boolean;
 }
 
@@ -83,10 +85,10 @@ interface LinksType {
 
 d3.json("data.json", function (error, data: JSONDataType) {
   const N1 = 8;
-  const circle_r = 20;
+  const circle_r = 23;
   const link_length = 203; //文字が重なる場合はここの値を変更
   const margin = 110; // 全体が入るようにノードを右にずらす
-  const width = N1 * (link_length + circle_r);
+  let width = N1 * (link_length + circle_r) + 500; // 最終的に右端のノードに合わせる
   const height = 600;
   const rect_x = 0;
   const rect_y = 0;
@@ -130,7 +132,43 @@ d3.json("data.json", function (error, data: JSONDataType) {
   let max_order_length = 0;
   let height_s = 0;
 
-  let isRecommend: boolean = true;
+  let isRecommend: boolean = false;
+
+  const find_order_by_id = (id: number): OrderDataType | undefined => {
+    return data.order_all.find((order) => order.id == id);
+  };
+
+  const x_place = (
+    pre_item_ids: number[],
+    time_interval: number[] | undefined
+  ) => {
+    const pre_item =
+      pre_item_ids.length === 1
+        ? place.find((p) => p.id == pre_item_ids[0])
+        : pre_item_ids.map((pre_item_id) =>
+            place.find((p) => p.id == pre_item_id)
+          );
+    if (!pre_item) {
+      return link_length;
+    } else if (Array.isArray(pre_item)) {
+      // return pre_item.r_x + link_length;
+      const ave_time_interval = time_interval?.reduce((acc, cur) => acc + cur);
+      return (
+        pre_item[0]!.r_x +
+        (ave_time_interval
+          ? (ave_time_interval / time_interval!.length) * 0.6 +
+            link_length * 0.4
+          : link_length)
+      );
+    } else {
+      return (
+        pre_item.r_x +
+        (time_interval
+          ? time_interval[0] * 0.6 + link_length * 0.4
+          : link_length)
+      );
+    }
+  };
 
   const push_graph_orders = (
     id: number,
@@ -138,11 +176,25 @@ d3.json("data.json", function (error, data: JSONDataType) {
     seq_length: number,
     seq_index: number
   ): void => {
-    if (id == -1) return;
+    if (id == -1) {
+      width = place[place.length - 1].r_x + margin;
+      return;
+    }
     const order = data.order_all.find((order) => order.id == id);
     if (!order) return;
     if (graph.orders.find((order) => order.id == id)) return;
     if (order.isGroup) {
+      // パスが通る座標
+      place.push({
+        id: order.id,
+        r_x: x_place(order.pre_item_id, order.time_interval),
+        r_y: push_place(
+          seq_length,
+          seq_index,
+          order.pre_item_id,
+          data.groups[order.order_type].length
+        ),
+      });
       data.groups[order.order_type].forEach((_order, index) => {
         // 各オーダーが通る座標
         graph.orders.push({
@@ -150,37 +202,29 @@ d3.json("data.json", function (error, data: JSONDataType) {
           id: order.id,
           frequency: order.frequency,
           next_item_id: order.next_item_id,
-          r_x: seq_number * link_length + margin,
+          pre_item_id: order.pre_item_id,
+          r_x: x_place(order.pre_item_id, order.time_interval),
           r_y:
             push_place(
               seq_length,
               seq_index,
+              order.pre_item_id,
               data.groups[order.order_type].length
             ) -
             (60 * (data.groups[order.order_type].length - 1)) / 2 +
             60 * index,
         });
       });
-      // パスが通る座標
-      place.push({
-        id: order.id,
-        r_x: seq_number * link_length + margin,
-        r_y: push_place(
-          seq_length,
-          seq_index,
-          data.groups[order.order_type].length
-        ),
-      });
     } else {
       graph.orders.push({
         ...order,
-        r_x: seq_number * link_length + margin,
-        r_y: push_place(seq_length, seq_index),
+        r_x: x_place(order.pre_item_id, order.time_interval),
+        r_y: push_place(seq_length, seq_index, order.pre_item_id),
       });
       place.push({
         id: order.id,
-        r_x: seq_number * link_length + margin,
-        r_y: push_place(seq_length, seq_index),
+        r_x: x_place(order.pre_item_id, order.time_interval),
+        r_y: push_place(seq_length, seq_index, order.pre_item_id),
       });
     }
 
@@ -199,11 +243,12 @@ d3.json("data.json", function (error, data: JSONDataType) {
 
     if (orders_by_seq.next_item_id[0] !== -1) {
       // linksを定義
-      orders_by_seq.next_item_id.forEach((id) => {
+      orders_by_seq.next_item_id.forEach((id, index) => {
         graph.links.push({
           source: orders_by_seq.id,
           target: id,
           value: 40,
+          factor: orders_by_seq.factor ? orders_by_seq.factor[index] : "",
         });
       });
     }
@@ -215,7 +260,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
     //     push_place(orders_by_seq.length, orders_by_seq.length);
     //   max_order_length = orders_by_seq.length;
     // }
-    height_s = 800;
+    height_s = 300;
   });
 
   // const test: number[][] = [];
@@ -495,14 +540,16 @@ d3.json("data.json", function (error, data: JSONDataType) {
                     d.target.order_type + "\n" + format(d.value); }); */
 
   // 上側のパスを出力
-  let link1_data = isRecommend
-    ? svg.append("g").selectAll(".link1").data(data.recommend).enter()
-    : svg.append("g").selectAll(".link1").data(graph.links).enter();
+  let link1_data = svg
+    .append("g")
+    .selectAll(".link1")
+    .data(graph.links)
+    .enter();
   const link1 = link1_data
     .append("path")
     .attr("class", "link1")
     .attr("id", function (d) {
-      return `link${d.source}${d.target}`;
+      return `link${d.source}-${d.target}`;
     })
     .attr("d", path1())
     .attr("stroke", "#ccc")
@@ -682,7 +729,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
   node
     .append("circle")
     .attr("r", function (d) {
-      return (d.frequency / 100 + 0.3) * circle_r;
+      return (d.frequency / 100) ** 1.2 * circle_r;
     })
     .style("fill", function (d, i) {
       return color(String(colorset(d.order_type)));
@@ -820,8 +867,49 @@ d3.json("data.json", function (error, data: JSONDataType) {
     .attr("d", "M0,-5L10,0L0,5 L10,0 L0, -5")
     .style("stroke", "black");
 
-  function push_place(parallel: number, j: number, group_num?: number) {
-    const c_line = height / 2;
+  function find_junction(orders: OrderDataType[]): OrderDataType {
+    const new_orders = orders.map((order) => {
+      let target = order;
+      while (target.next_item_id.length == 1) {
+        if (target.pre_item_id.length == 1) {
+          target = find_order_by_id(target.pre_item_id[0])!;
+        } else {
+          //
+        }
+      }
+      return target;
+    });
+    const uniq = [...new Set(new_orders)];
+    if (uniq.length == 1) {
+      console.log(uniq[0]);
+      return uniq[0];
+    } else {
+      return find_junction(uniq);
+    }
+  }
+
+  function push_place(
+    parallel: number,
+    j: number,
+    pre_order_ids: number[],
+    group_num?: number
+  ) {
+    let c_line = height * 0.6;
+
+    if (pre_order_ids.length == 1) {
+      const pre_order = place.find((order) => order.id == pre_order_ids[0]);
+      if (!pre_order || pre_order.id == 0) return c_line;
+      c_line = pre_order.r_y;
+    } else if (pre_order_ids.length > 1) {
+      let orders = pre_order_ids.map(
+        (pre_order_id) => find_order_by_id(pre_order_id)!
+      );
+      const target_order = find_junction(orders);
+      c_line = place.find((order) => order.id == target_order.id)!.r_y;
+      console.log(c_line);
+    }
+
+    // const c_line = height / 2;
     if (parallel == 1) {
       return c_line;
     }
@@ -1004,30 +1092,54 @@ d3.json("data.json", function (error, data: JSONDataType) {
 
   branch_orders.forEach((branch_order) => {
     variants.push(
-      data.recommend.filter((rec_link) => rec_link.source == branch_order.id)
+      graph.links.filter((rec_link) => rec_link.source == branch_order.id)
     );
   });
 
   console.log(variants);
+  const factors: LinksType[] = [];
 
-  variants.forEach((variant) => {
+  variants.forEach((variant, index) => {
+    console.log(variant);
     d3.select("#buttons")
-      .selectAll("button")
+      .selectAll(`button${index}`)
       .data(variant)
       .enter()
       .append("button")
       .text(function (d) {
-        return d.factor;
+        return d.factor ?? "";
       })
       .on("click", function (d) {
         selection.push(d.factor);
-        d3.selectAll(".link1").attr("stroke", "#ccc");
-        const path = test2.find((ids) => ids.find((id) => id == d.target));
-        path?.forEach((p, i) => {
-          if (!path[i + 1]) return;
-          d3.select(`#link${p}${path[i + 1]}`).attr("stroke", "pink");
+        const unselected_factors = variants
+          .find((variant) => variant.includes(d))
+          ?.filter((path) => path !== d);
+        unselected_factors?.forEach((path) => {
+          const index = factors.indexOf(path);
+          if (index == -1) return;
+          factors.splice(index, 1);
         });
+        factors.push(d);
+
+        d3.selectAll(".link1").attr("stroke", "#ccc");
+
+        let paths = test2.concat();
+
+        factors.forEach((link) => {
+          paths = paths.filter((path) => path.includes(link.target));
+        });
+
+        console.log(paths);
+
+        // const path = test2.find((ids) => ids.find((id) => id == d.target));
+        paths?.forEach((path) =>
+          path.forEach((p, i) => {
+            if (!path[i + 1]) return;
+            d3.select(`#link${p}-${path[i + 1]}`).attr("stroke", "thistle");
+          })
+        );
       });
+    d3.select("#buttons").append("br");
   });
 
   // d3.select("#buttons").
