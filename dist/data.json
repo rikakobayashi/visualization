@@ -21,7 +21,7 @@
       "frequency": 64,
       "pre_item_id": [0],
       "next_item_id": [2, 3],
-      "factor": ["入院歴あり", "入院歴なし"]
+      "factor": ["入院歴なし", "入院歴あり"]
     },
     {
       "id": 2,
@@ -108,7 +108,8 @@
       "day": "",
       "frequency": 93,
       "pre_item_id": [7],
-      "next_item_id": [10]
+      "next_item_id": [10],
+      "isInjection": true
     },
     {
       "id": 9,
@@ -119,7 +120,8 @@
       "day": "",
       "frequency": 93,
       "pre_item_id": [7],
-      "next_item_id": [11]
+      "next_item_id": [11],
+      "isInjection": true
     },
     {
       "id": 10,
@@ -130,7 +132,8 @@
       "day": "",
       "frequency": 93,
       "pre_item_id": [8],
-      "next_item_id": [12]
+      "next_item_id": [12],
+      "isInjection": true
     },
     {
       "id": 11,
@@ -141,7 +144,8 @@
       "day": "",
       "frequency": 93,
       "pre_item_id": [9],
-      "next_item_id": [12]
+      "next_item_id": [12],
+      "isInjection": true
     },
     {
       "id": 12,
@@ -153,6 +157,92 @@
       "frequency": 100,
       "pre_item_id": [10, 11],
       "next_item_id": [-1]
+    }
+  ],
+  "patient_orders": [
+    {
+      "order_type": "start",
+      "order_explain": "start",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "処方",
+      "order_explain": "内服薬剤",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "服薬指導",
+      "order_explain": "薬剤管理指導料3",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "検体検査",
+      "order_explain": "総蛋白",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "血液型関連検査",
+      "order_explain": "ABO式血液型",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "クロスマッチ（Ｔ＆Ｓ）検査",
+      "order_explain": "T＆S検査",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "処方",
+      "order_explain": "外用薬剤",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "手術麻酔",
+      "order_explain": "閉鎖循環式全身麻酔",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "手術",
+      "order_explain": "膀胱悪性腫瘍手術",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "注射",
+      "order_explain": "静脈内注射",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "緊急検査",
+      "order_explain": "WBC",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "病理診断",
+      "order_explain": "T-M",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
     }
   ],
   "groups": {

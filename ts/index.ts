@@ -7,6 +7,7 @@ const Data: JSONDataType = data;
 
 interface JSONDataType {
   order_all: OrderDataType[];
+  patient_orders: GroupOrderDataType[];
   groups: { [key: string]: GroupOrderDataType[] };
 }
 
@@ -23,6 +24,7 @@ interface OrderDataType {
   factor?: string[];
   time_interval?: number[];
   isGroup?: boolean;
+  isInjection?: boolean;
 }
 
 interface GroupOrderDataType {
@@ -127,6 +129,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
     const order = data.order_all.find((order) => order.id == id);
     if (!order) return;
     if (graph.orders.find((order) => order.id == id)) return;
+    // グループの場合
     if (order.isGroup) {
       // パスが通る座標
       place.push({
@@ -159,14 +162,17 @@ d3.json("data.json", function (error, data: JSONDataType) {
             60 * index,
         });
       });
+      // 普通のオーダーの場合
     } else {
-      graph.orders.push({
-        ...order,
+      // パスが通る座標
+      place.push({
+        id: order.id,
         r_x: x_place(order.pre_item_id, order.time_interval),
         r_y: push_place(seq_length, seq_index, order.pre_item_id),
       });
-      place.push({
-        id: order.id,
+      // 各オーダーが通る座標
+      graph.orders.push({
+        ...order,
         r_x: x_place(order.pre_item_id, order.time_interval),
         r_y: push_place(seq_length, seq_index, order.pre_item_id),
       });
@@ -183,6 +189,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
   };
 
   data.order_all.forEach((orders_by_seq, seq_index) => {
+    // placeとgraph.ordersを定義
     push_graph_orders(0, 0, 1, 1);
 
     if (orders_by_seq.next_item_id[0] !== -1) {
@@ -207,26 +214,191 @@ d3.json("data.json", function (error, data: JSONDataType) {
     height_s = 300;
   });
 
-  const test2: number[][] = [];
+  const allPathId: number[][] = [];
 
-  const findId = (id: number, arr: number[]) => {
+  const getAllPathId = (id: number, arr: number[]) => {
     const targetOrder = data.order_all.find((order) => order.id == id);
     if (!targetOrder) {
-      return test2.push(arr.concat());
+      return allPathId.push(arr.concat());
     }
     arr.push(id);
     targetOrder?.next_item_id.forEach((id) => {
-      findId(id, arr.concat());
+      getAllPathId(id, arr.concat());
     });
   };
 
-  findId(0, []);
+  getAllPathId(0, []);
 
-  console.log(test2.concat());
+  console.log(allPathId.concat());
 
   console.log(JSON.parse(JSON.stringify(graph)));
   console.log(JSON.parse(JSON.stringify(place)));
   console.log(JSON.parse(JSON.stringify(a_line)));
+
+  const patientPath = [];
+  let i = 0;
+  let j = 0;
+  let i_progress_count = 0;
+  let j_progress_count = 0;
+
+  while (data.order_all[i] && data.patient_orders[j]) {
+    if (data.order_all[i].isGroup) {
+      const groupOrders = data.groups[data.order_all[i].order_type];
+    }
+    if (data.order_all[i].order_type === data.patient_orders[j].order_type) {
+      patientPath.push(data.order_all[i].id);
+      i++;
+      j++;
+      i_progress_count = 0;
+      j_progress_count = 0;
+      continue;
+    } else {
+      if (
+        data.patient_orders[j + 1]?.order_type === data.order_all[i]?.order_type
+      ) {
+        j++;
+        j_progress_count++;
+      } else if (
+        data.order_all[i + 1]?.order_type === data.order_all[j]?.order_type
+      ) {
+        i++;
+        i_progress_count++;
+      } else {
+        j++;
+      }
+    }
+  }
+
+  console.log("patientpath");
+  console.log(patientPath.concat());
+
+  function getAllPathName(
+    path_id_array: Array<number>
+  ): Array<string | string[]> {
+    return path_id_array.map((id) => {
+      const order = find_order_by_id(id)!;
+      if (order.isGroup || order.isInjection) {
+        const group_orders = data.groups[order.order_type];
+        return group_orders.map((group_order) => group_order.order_type);
+      } else {
+        return order.order_type;
+      }
+    });
+  }
+
+  const passedPath = allPathId.reduce(
+    (acc: Array<number>, cur: Array<number>) => {
+      if (acc.length === 0) {
+        acc = cur;
+      }
+      if (
+        getConcordance(acc, data.patient_orders) <
+        getConcordance(cur, data.patient_orders)
+      ) {
+        acc = cur;
+      }
+      return acc;
+    },
+    [] as Array<number>
+  );
+
+  console.log("passedPath");
+
+  console.log(passedPath);
+
+  function getConcordance(
+    all_path_array: Array<number>,
+    patient_orders: GroupOrderDataType[]
+  ) {
+    const path_names = getAllPathName(all_path_array).flat();
+    let count = 0;
+    path_names.forEach((name) => {
+      if (patient_orders.find((order) => order.order_type === name)) {
+        count++;
+      }
+    });
+    return count / path_names.length;
+  }
+
+  function getMatchPath(
+    path_id_array: number[],
+    patient_orders: GroupOrderDataType[]
+  ) {
+    const path_name_array = getAllPathName(path_id_array);
+    let _i = 0;
+    let _j = 0;
+    const matchedPath = [];
+    while (path_name_array[_j]) {
+      // console.log("_i: " + _i + " / _j: " + _j);
+      if (!patient_orders[_i]) break;
+      const path_name = path_name_array[_j];
+      if (Array.isArray(path_name)) {
+        const group_order = patient_orders.slice(_i, _i + path_name.length);
+        if (
+          JSON.stringify(path_name.sort()) ==
+          JSON.stringify(group_order.map((order) => order.order_type).sort())
+        ) {
+          console.log(path_name);
+          matchedPath.push(path_id_array[_j]);
+          _i += path_name.length;
+          _j++;
+          continue;
+        } else if (
+          path_name.every((name) =>
+            patient_orders.find((order) => order.order_type === name)
+              ? true
+              : false
+          )
+        ) {
+          console.log("~~~~");
+          _i++;
+        } else {
+          // TODO
+          _j++;
+          continue;
+        }
+      } else {
+        if (path_name === patient_orders[_i].order_type) {
+          matchedPath.push(path_id_array[_j]);
+          _i++;
+          _j++;
+          console.log(path_name);
+          continue;
+        } else if (
+          // 頻出パスが多い、患者のパスが飛んでいる
+          path_name_array.indexOf(patient_orders[_i].order_type) !== -1
+        ) {
+          const next_order_index = path_name_array.indexOf(
+            patient_orders[_i + 1].order_type
+          );
+          if (
+            next_order_index !== -1 &&
+            path_name_array.indexOf(patient_orders[_i].order_type) <
+              next_order_index
+          ) {
+            matchedPath.push(path_id_array[_j]);
+            _j++;
+            continue;
+          } else {
+            _i++;
+          }
+        } else if (
+          patient_orders.find((order) => order.order_type === path_name)
+        ) {
+          _i++;
+        } else {
+          // matchedPath.push(path_id_array[_j]);
+          _i++;
+          _j++;
+        }
+      }
+    }
+    return matchedPath;
+  }
+
+  const matchedPath = getMatchPath(passedPath, data.patient_orders);
+
+  console.log(matchedPath);
 
   //Set up the color scale
   const color = d3.scale.category20();
@@ -622,6 +794,16 @@ d3.json("data.json", function (error, data: JSONDataType) {
     );
   });
 
+  passedPath.forEach((p, i) => {
+    // if (!path[i + 1]) return;
+    d3.select(`#link${p}-${passedPath[i + 1]}`).attr("stroke", "thistle");
+  });
+
+  matchedPath.forEach((p, i) => {
+    // if (!path[i + 1]) return;
+    d3.select(`#link${p}-${matchedPath[i + 1]}`).attr("stroke", "#bce2e8");
+  });
+
   console.log(variants);
   const factors: LinksType[] = [];
 
@@ -649,7 +831,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
 
         d3.selectAll(".link1").attr("stroke", "#ccc");
 
-        let paths = test2.concat();
+        let paths = allPathId.concat();
 
         factors.forEach((link) => {
           paths = paths.filter((path) => path.includes(link.target));
