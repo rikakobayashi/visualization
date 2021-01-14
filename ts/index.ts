@@ -2,12 +2,13 @@
 import * as d3 from "d3";
 import { sankey } from "d3-sankey";
 import data from "../dist/data.json";
+import patientData from "../dist/patient3.json";
 
 const Data: JSONDataType = data;
+const PatientData: PatientOrderDataType[] = patientData.patient_orders;
 
 interface JSONDataType {
   order_all: OrderDataType[];
-  patient_orders: GroupOrderDataType[];
   groups: { [key: string]: GroupOrderDataType[] };
 }
 
@@ -33,6 +34,22 @@ interface GroupOrderDataType {
   order_name: string;
   code: string;
   day: string;
+}
+
+interface PatientOrderDataType {
+  patientid: string;
+  orderno: string;
+  ordertypevalue: string;
+  orderexplain: string;
+  enforcedinfodate: string;
+  inhospdate: string;
+  leavehospdate: string;
+  productname: string;
+  nowprice: string;
+  postprice: string;
+  efficacycode: string;
+  efficacy: string;
+  enforcedinfotime: string;
 }
 
 interface OrderType extends OrderDataType {
@@ -241,11 +258,11 @@ d3.json("data.json", function (error, data: JSONDataType) {
   let i_progress_count = 0;
   let j_progress_count = 0;
 
-  while (data.order_all[i] && data.patient_orders[j]) {
+  while (data.order_all[i] && PatientData[j]) {
     if (data.order_all[i].isGroup) {
       const groupOrders = data.groups[data.order_all[i].order_type];
     }
-    if (data.order_all[i].order_type === data.patient_orders[j].order_type) {
+    if (data.order_all[i].order_type === PatientData[j].ordertypevalue) {
       patientPath.push(data.order_all[i].id);
       i++;
       j++;
@@ -254,7 +271,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
       continue;
     } else {
       if (
-        data.patient_orders[j + 1]?.order_type === data.order_all[i]?.order_type
+        PatientData[j + 1]?.ordertypevalue === data.order_all[i]?.order_type
       ) {
         j++;
         j_progress_count++;
@@ -291,10 +308,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
       if (acc.length === 0) {
         acc = cur;
       }
-      if (
-        getConcordance(acc, data.patient_orders) <
-        getConcordance(cur, data.patient_orders)
-      ) {
+      if (getConcordance(acc, PatientData) < getConcordance(cur, PatientData)) {
         acc = cur;
       }
       return acc;
@@ -308,12 +322,12 @@ d3.json("data.json", function (error, data: JSONDataType) {
 
   function getConcordance(
     all_path_array: Array<number>,
-    patient_orders: GroupOrderDataType[]
+    patient_orders: PatientOrderDataType[]
   ) {
     const path_names = getAllPathName(all_path_array).flat();
     let count = 0;
     path_names.forEach((name) => {
-      if (patient_orders.find((order) => order.order_type === name)) {
+      if (patient_orders.find((order) => order.ordertypevalue === name)) {
         count++;
       }
     });
@@ -322,12 +336,12 @@ d3.json("data.json", function (error, data: JSONDataType) {
 
   function getMatchPath(
     path_id_array: number[],
-    patient_orders: GroupOrderDataType[]
+    patient_orders: PatientOrderDataType[]
   ) {
     const path_name_array = getAllPathName(path_id_array);
     let _i = 0;
-    let _j = 0;
-    const matchedPath = [];
+    let _j = 1;
+    const matchedPath = [0];
     while (path_name_array[_j]) {
       // console.log("_i: " + _i + " / _j: " + _j);
       if (!patient_orders[_i]) break;
@@ -336,7 +350,9 @@ d3.json("data.json", function (error, data: JSONDataType) {
         const group_order = patient_orders.slice(_i, _i + path_name.length);
         if (
           JSON.stringify(path_name.sort()) ==
-          JSON.stringify(group_order.map((order) => order.order_type).sort())
+          JSON.stringify(
+            group_order.map((order) => order.ordertypevalue).sort()
+          )
         ) {
           console.log(path_name);
           matchedPath.push(path_id_array[_j]);
@@ -345,7 +361,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
           continue;
         } else if (
           path_name.every((name) =>
-            patient_orders.find((order) => order.order_type === name)
+            patient_orders.find((order) => order.ordertypevalue === name)
               ? true
               : false
           )
@@ -354,11 +370,12 @@ d3.json("data.json", function (error, data: JSONDataType) {
           _i++;
         } else {
           // TODO
+          matchedPath.push(path_id_array[_j]);
           _j++;
           continue;
         }
       } else {
-        if (path_name === patient_orders[_i].order_type) {
+        if (path_name === patient_orders[_i].ordertypevalue) {
           matchedPath.push(path_id_array[_j]);
           _i++;
           _j++;
@@ -366,14 +383,14 @@ d3.json("data.json", function (error, data: JSONDataType) {
           continue;
         } else if (
           // 頻出パスが多い、患者のパスが飛んでいる
-          path_name_array.indexOf(patient_orders[_i].order_type) !== -1
+          path_name_array.indexOf(patient_orders[_i].ordertypevalue) !== -1
         ) {
           const next_order_index = path_name_array.indexOf(
-            patient_orders[_i + 1].order_type
+            patient_orders[_i + 1].ordertypevalue
           );
           if (
             next_order_index !== -1 &&
-            path_name_array.indexOf(patient_orders[_i].order_type) <
+            path_name_array.indexOf(patient_orders[_i].ordertypevalue) <
               next_order_index
           ) {
             matchedPath.push(path_id_array[_j]);
@@ -383,7 +400,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
             _i++;
           }
         } else if (
-          patient_orders.find((order) => order.order_type === path_name)
+          patient_orders.find((order) => order.ordertypevalue === path_name)
         ) {
           _i++;
         } else {
@@ -396,7 +413,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
     return matchedPath;
   }
 
-  const matchedPath = getMatchPath(passedPath, data.patient_orders);
+  const matchedPath = getMatchPath(passedPath, PatientData);
 
   console.log(matchedPath);
 
