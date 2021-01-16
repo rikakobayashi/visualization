@@ -779,7 +779,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
   node2
     .append("text")
     .attr("class", "node2_text")
-    .attr("font-size", 12)
+    .attr("font-size", 13)
     .style("text-anchor", "middle")
     .text(function (d) {
       return "[" + d.order_type + "/ day : " + d.day + "]";
