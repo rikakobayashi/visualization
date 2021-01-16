@@ -82,14 +82,19 @@ d3.json("data.json", function (error, data: JSONDataType) {
   const link_length = 203; //文字が重なる場合はここの値を変更
   const margin = 110; // 全体が入るようにノードを右にずらす
   let width = N1 * (link_length + circle_r) + 500; // 最終的に右端のノードに合わせる
-  const height = 600;
+  const height = 1000;
   const graph: { orders: OrderType[]; links: LinksType[] } = {
+    orders: [],
+    links: [],
+  };
+  const graph2: { orders: OrderType[]; links: LinksType[] } = {
     orders: [],
     links: [],
   };
 
   const place: PlaceType[] = []; //nodeの中心位置を記録する{r_x,r_y}
-  const a_line: LineType[] = [];
+  const place2: PlaceType[] = []; //nodeの中心位置を記録する{r_x,r_y}
+  // const a_line: LineType[] = [];
 
   const dataTypes4Color: String[] = [];
 
@@ -231,6 +236,40 @@ d3.json("data.json", function (error, data: JSONDataType) {
     height_s = 300;
   });
 
+  PatientData.forEach((order, index) => {
+    place2.push({
+      id: index,
+      r_x: link_length * (index + 1),
+      r_y: height * 0.7,
+    });
+
+    graph2.orders.push({
+      id: index,
+      order_type: order.ordertypevalue,
+      order_explain: order.orderexplain,
+      order_name: order.productname,
+      code: order.efficacycode,
+      day: "",
+      frequency: 100,
+      pre_item_id: [index - 1],
+      next_item_id: PatientData[index + 1] ? [index + 1] : [-1],
+      r_x: link_length * (index + 1),
+      r_y: height * 0.7,
+    });
+
+    if (PatientData[index + 1]) {
+      graph2.links.push({
+        source: index,
+        target: index + 1,
+        value: 40,
+      });
+    }
+
+    if (width < link_length * (index + 1)) {
+      width = link_length * (index + 1) + margin;
+    }
+  });
+
   const allPathId: number[][] = [];
 
   const getAllPathId = (id: number, arr: number[]) => {
@@ -250,7 +289,9 @@ d3.json("data.json", function (error, data: JSONDataType) {
 
   console.log(JSON.parse(JSON.stringify(graph)));
   console.log(JSON.parse(JSON.stringify(place)));
-  console.log(JSON.parse(JSON.stringify(a_line)));
+
+  console.log(JSON.parse(JSON.stringify(graph2)));
+  console.log(JSON.parse(JSON.stringify(place2)));
 
   const patientPath = [];
   let i = 0;
@@ -436,17 +477,18 @@ d3.json("data.json", function (error, data: JSONDataType) {
       return formatNumber(d) + " " + units;
     };
 
-  const path1 = function () {
+  const path = function (pop_place: (id: number) => PlaceType | undefined) {
     let curvature = 0.5;
 
     function link(d: LinksType, i: number) {
-      const x0 = pop_place(find_link(i).source)!.r_x,
-        x1 = pop_place(find_link(i).target)!.r_x,
+      const x0 = pop_place(d.source)!.r_x,
+        x1 = pop_place(d.target)!.r_x,
         xi = d3.interpolateNumber(x0, x1),
         x2 = xi(curvature),
         x3 = xi(1 - curvature),
-        y0 = pop_place(find_link(i).source)!.r_y,
-        y1 = pop_place(find_link(i).target)!.r_y;
+        y0 = pop_place(d.source)!.r_y,
+        y1 = pop_place(d.target)!.r_y;
+      console.log("x0: " + x0 + " x1: " + x1 + " y0: " + y0 + " y1: " + y1);
       return (
         "M" +
         x0 +
@@ -476,7 +518,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
     return link;
   };
 
-  // 上側のパスを出力
+  // パスを出力
   let link1_data = svg
     .append("g")
     .selectAll(".link1")
@@ -488,7 +530,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
     .attr("id", function (d) {
       return `link${d.source}-${d.target}`;
     })
-    .attr("d", path1())
+    .attr("d", path(pop_place))
     .attr("stroke", "#ccc")
     // .attr("stroke-opacity", .7)
     .style("stroke-width", function (d) {
@@ -509,6 +551,48 @@ d3.json("data.json", function (error, data: JSONDataType) {
     })
     .attr("y", function (d) {
       return (pop_place(d.source)!.r_y + pop_place(d.target)!.r_y) / 2;
+    })
+    .style("text-anchor", "middle")
+    .style("dominant-baseline", "central")
+    .text(function (d) {
+      if (d.factor) return d.factor;
+      return "";
+    });
+
+  let link2_data = svg
+    .append("g")
+    .selectAll(".link2")
+    .data(graph2.links)
+    .enter();
+
+  // throw Error();
+  const link2 = link2_data
+    .append("path")
+    .attr("class", "link2")
+    .attr("id", function (d) {
+      return `link2_${d.source}-${d.target}`;
+    })
+    .attr("d", path(pop_place2))
+    .attr("stroke", "#ccc")
+    // .attr("stroke-opacity", .7)
+    .style("stroke-width", function (d) {
+      return Math.max(
+        1,
+        circle_r * 2
+        // ((circle_r * 2 * data.Pnum[0].value) / Pnumsum) * 2 * 0.7
+      );
+    })
+    .attr("fill", "none");
+
+  link2_data
+    .append("text")
+    .attr("class", "link2_text")
+    .attr("font-size", 15)
+    .attr("x", function (d) {
+      return (pop_place2(d.source)!.r_x + pop_place2(d.target)!.r_x) / 2;
+    })
+    .attr("y", function (d) {
+      return (pop_place2(d.source)!.r_y + pop_place2(d.target)!.r_y) / 2;
     })
     .style("text-anchor", "middle")
     .style("dominant-baseline", "central")
@@ -566,7 +650,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
   node
     .append("text")
     .attr("class", "node_text")
-    .attr("font-size", 12)
+    .attr("font-size", 13)
     .style("text-anchor", "middle")
     .text(function (d) {
       return "[" + d.order_type + "/ day : " + d.day + "]";
@@ -647,6 +731,135 @@ d3.json("data.json", function (error, data: JSONDataType) {
       return d.r_y - 60;
     });
 
+  const node2 = svg
+    .selectAll(".node2")
+    .data(graph2.orders)
+    .enter()
+    .append("g")
+    .attr("class", "node2")
+    .attr("id", function (d, i) {
+      return `node2-${i}`;
+    })
+    .on("click", function (this: EventTarget) {
+      if (
+        d3.select(this).select(".info2_text1").style("visibility") == "visible"
+      ) {
+        d3.select(this).select(".info2_text1").style("visibility", "hidden");
+        d3.select(this).select(".info2_text2").style("visibility", "hidden");
+        d3.select(this).select(".info2_text3").style("visibility", "hidden");
+        d3.select(this).select(".info2_rect").style("visibility", "hidden");
+      } else if (
+        d3.select(this).select(".info2_text1").style("visibility") == "hidden"
+      ) {
+        d3.select(this).select(".info2_text1").style("visibility", "visible");
+        d3.select(this).select(".info2_text2").style("visibility", "visible");
+        d3.select(this).select(".info2_text3").style("visibility", "visible");
+        d3.select(this).select(".info2_rect").style("visibility", "visible");
+      }
+    });
+  node2
+    .append("circle")
+    .attr("r", function (d) {
+      return circle_r;
+    })
+    .style("fill", function (d, i) {
+      return color(String(colorset(d.order_type)));
+    })
+    .attr("cx", function (d, i) {
+      return d.r_x;
+    })
+    .attr("cy", function (d, i) {
+      return d.r_y;
+    })
+    .append("title")
+    .text(function (d) {
+      return `出現率: ${d.frequency}%`;
+    });
+
+  node2
+    .append("text")
+    .attr("class", "node2_text")
+    .attr("font-size", 12)
+    .style("text-anchor", "middle")
+    .text(function (d) {
+      return "[" + d.order_type + "/ day : " + d.day + "]";
+    })
+    .attr("x", function (d, i) {
+      return d.r_x;
+    })
+    .attr("y", function (d, i) {
+      return d.r_y - 30;
+    });
+
+  node2
+    .append("rect")
+    .style("visibility", "hidden")
+    .style("fill", function (d, i) {
+      return color(String(colorset(d.order_type)));
+    })
+    .attr("class", "info2_rect")
+    .attr("fill-opacity", ".7")
+    .attr("width", 200)
+    .attr("height", 80)
+    .attr("stroke", "black")
+    .attr("stroke-width", "0.5pt")
+    .attr("x", function (d, i) {
+      return d.r_x - 105;
+    })
+    .attr("y", function (d, i) {
+      return d.r_y - 120;
+    });
+
+  node2
+    .append("text")
+    .style("visibility", "hidden")
+    .attr("class", "info2_text1")
+    .attr("font-size", 15)
+    .text(function (d) {
+      return d.order_explain;
+    })
+    .style("text-anchor", "middle")
+    .attr("x", function (d, i) {
+      return d.r_x;
+    })
+    .attr("y", function (d, i) {
+      return d.r_y - 100;
+    });
+
+  node2
+    .append("text")
+    .style("visibility", "hidden")
+    .attr("class", "info2_text2")
+    .attr("font-size", 15)
+    .text(function (d) {
+      if (d.order_name == "") return "null";
+      return d.order_name;
+    })
+    .style("text-anchor", "middle")
+    .attr("x", function (d, i) {
+      return d.r_x;
+    })
+    .attr("y", function (d, i) {
+      return d.r_y - 80;
+    });
+
+  node2
+    .append("text")
+    .style("visibility", "hidden")
+    .attr("class", "info2_text3")
+    .attr("font-size", 15)
+    .text(function (d) {
+      if (d.code == "") return "null";
+      return d.code;
+    })
+    .style("text-anchor", "middle")
+    .attr("x", function (d, i) {
+      return d.r_x;
+    })
+    .attr("y", function (d, i) {
+      return d.r_y - 60;
+    });
+
   //---Insert-------
   svg
     .append("defs")
@@ -694,7 +907,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
     pre_order_ids: number[],
     group_num?: number
   ) {
-    let c_line = height * 0.6;
+    let c_line = height * 0.36;
 
     if (pre_order_ids.length == 1) {
       const pre_order = place.find((order) => order.id == pre_order_ids[0]);
@@ -729,6 +942,10 @@ d3.json("data.json", function (error, data: JSONDataType) {
 
   function pop_place(id: number) {
     return place.find((place) => place.id == id);
+  }
+
+  function pop_place2(id: number) {
+    return place2.find((place) => place.id == id);
   }
 
   function find_link(id: number) {
@@ -824,46 +1041,46 @@ d3.json("data.json", function (error, data: JSONDataType) {
   console.log(variants);
   const factors: LinksType[] = [];
 
-  variants.forEach((variant, index) => {
-    console.log(variant);
-    d3.select("#buttons")
-      .selectAll(`button${index}`)
-      .data(variant)
-      .enter()
-      .append("button")
-      .text(function (d) {
-        return d.factor ?? "";
-      })
-      .on("click", function (d) {
-        selection.push(d.factor);
-        const unselected_factors = variants
-          .find((variant) => variant.includes(d))
-          ?.filter((path) => path !== d);
-        unselected_factors?.forEach((path) => {
-          const index = factors.indexOf(path);
-          if (index == -1) return;
-          factors.splice(index, 1);
-        });
-        factors.push(d);
+  // variants.forEach((variant, index) => {
+  //   console.log(variant);
+  //   d3.select("#buttons")
+  //     .selectAll(`button${index}`)
+  //     .data(variant)
+  //     .enter()
+  //     .append("button")
+  //     .text(function (d) {
+  //       return d.factor ?? "";
+  //     })
+  //     .on("click", function (d) {
+  //       selection.push(d.factor);
+  //       const unselected_factors = variants
+  //         .find((variant) => variant.includes(d))
+  //         ?.filter((path) => path !== d);
+  //       unselected_factors?.forEach((path) => {
+  //         const index = factors.indexOf(path);
+  //         if (index == -1) return;
+  //         factors.splice(index, 1);
+  //       });
+  //       factors.push(d);
 
-        d3.selectAll(".link1").attr("stroke", "#ccc");
+  //       d3.selectAll(".link1").attr("stroke", "#ccc");
 
-        let paths = allPathId.concat();
+  //       let paths = allPathId.concat();
 
-        factors.forEach((link) => {
-          paths = paths.filter((path) => path.includes(link.target));
-        });
+  //       factors.forEach((link) => {
+  //         paths = paths.filter((path) => path.includes(link.target));
+  //       });
 
-        console.log(paths);
+  //       console.log(paths);
 
-        // const path = test2.find((ids) => ids.find((id) => id == d.target));
-        paths?.forEach((path) =>
-          path.forEach((p, i) => {
-            if (!path[i + 1]) return;
-            d3.select(`#link${p}-${path[i + 1]}`).attr("stroke", "thistle");
-          })
-        );
-      });
-    d3.select("#buttons").append("br");
-  });
+  //       // const path = test2.find((ids) => ids.find((id) => id == d.target));
+  //       paths?.forEach((path) =>
+  //         path.forEach((p, i) => {
+  //           if (!path[i + 1]) return;
+  //           d3.select(`#link${p}-${path[i + 1]}`).attr("stroke", "thistle");
+  //         })
+  //       );
+  //     });
+  //   d3.select("#buttons").append("br");
+  // });
 });
