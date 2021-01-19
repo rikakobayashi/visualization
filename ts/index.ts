@@ -1,6 +1,6 @@
 //Constants for the SVG
 import * as d3 from "d3";
-import { sankey } from "d3-sankey";
+import { sankey, sankeyLinkHorizontal } from "d3-sankey";
 import data from "../dist/data.json";
 import patientData from "../dist/patient3.json";
 
@@ -23,6 +23,7 @@ interface OrderDataType {
   next_item_id: Array<number>;
   pre_item_id: Array<number>;
   factor?: string[];
+  branch_frequency?: number;
   time_interval?: number[];
   isGroup?: boolean;
   isInjection?: boolean;
@@ -74,6 +75,8 @@ interface LinksType {
   value: number;
   precision?: string;
   factor?: string;
+  branch_frequency?: number;
+  branch_position?: number;
 }
 
 d3.json("data.json", function (error, data: JSONDataType) {
@@ -116,24 +119,35 @@ d3.json("data.json", function (error, data: JSONDataType) {
         : pre_item_ids.map((pre_item_id) =>
             place.find((p) => p.id == pre_item_id)
           );
+    const min_length = 100;
+    const max_length = link_length * 3;
     if (!pre_item) {
       return link_length;
     } else if (Array.isArray(pre_item)) {
       // return pre_item.r_x + link_length;
       const ave_time_interval = time_interval?.reduce((acc, cur) => acc + cur);
+      const length = ave_time_interval
+        ? (ave_time_interval / time_interval!.length) * 0.6 + link_length * 0.4
+        : link_length;
       return (
         pre_item[0]!.r_x +
-        (ave_time_interval
-          ? (ave_time_interval / time_interval!.length) * 0.6 +
-            link_length * 0.4
-          : link_length)
+        (length > max_length
+          ? max_length
+          : length < min_length
+          ? min_length
+          : length)
       );
     } else {
+      const length = time_interval
+        ? time_interval[0] * 0.6 + link_length * 0.4
+        : link_length;
       return (
         pre_item.r_x +
-        (time_interval
-          ? time_interval[0] * 0.6 + link_length * 0.4
-          : link_length)
+        (length > max_length
+          ? max_length
+          : length < min_length
+          ? min_length
+          : length)
       );
     }
   };
@@ -217,11 +231,27 @@ d3.json("data.json", function (error, data: JSONDataType) {
     if (orders_by_seq.next_item_id[0] !== -1) {
       // linksを定義
       orders_by_seq.next_item_id.forEach((id, index) => {
+        console.log(
+          find_order_by_id(id)?.pre_item_id.indexOf(orders_by_seq.id)
+        );
         graph.links.push({
           source: orders_by_seq.id,
           target: id,
           value: 40,
           factor: orders_by_seq.factor ? orders_by_seq.factor[index] : "",
+          branch_frequency:
+            orders_by_seq.branch_frequency ||
+            find_order_by_id(id)?.branch_frequency ||
+            undefined,
+          branch_position:
+            orders_by_seq.branch_frequency &&
+            find_order_by_id(id)?.branch_frequency
+              ? undefined
+              : orders_by_seq.branch_frequency
+              ? find_order_by_id(id)?.pre_item_id.indexOf(orders_by_seq.id)
+              : find_order_by_id(id)?.branch_frequency
+              ? index
+              : undefined,
         });
       });
     }
@@ -481,14 +511,30 @@ d3.json("data.json", function (error, data: JSONDataType) {
     let curvature = 0.5;
 
     function link(d: LinksType, i: number) {
-      const x0 = pop_place(d.source)!.r_x,
-        x1 = pop_place(d.target)!.r_x,
+      const targetPlace = pop_place(d.target);
+      const sourcePlace = pop_place(d.source);
+      const targetOrder = find_order_by_id(d.target);
+      const sourceOrder = find_order_by_id(d.source);
+
+      const x0 = sourcePlace!.r_x,
+        x1 = targetPlace!.r_x,
         xi = d3.interpolateNumber(x0, x1),
         x2 = xi(curvature),
         x3 = xi(1 - curvature),
-        y0 = pop_place(d.source)!.r_y,
-        y1 = pop_place(d.target)!.r_y;
-      console.log("x0: " + x0 + " x1: " + x1 + " y0: " + y0 + " y1: " + y1);
+        y0 =
+          targetOrder?.branch_frequency && d.branch_position === 0
+            ? sourcePlace!.r_y - (circle_r * (100 - d.branch_frequency!)) / 100
+            : targetOrder?.branch_frequency && d.branch_position === 1
+            ? sourcePlace!.r_y + (circle_r * (100 - d.branch_frequency!)) / 100
+            : sourcePlace!.r_y,
+        y1 =
+          sourceOrder?.branch_frequency && d.branch_position === 0
+            ? targetPlace!.r_y - (circle_r * (100 - d.branch_frequency!)) / 100
+            : sourceOrder?.branch_frequency && d.branch_position === 1
+            ? targetPlace!.r_y + (circle_r * (100 - d.branch_frequency!)) / 100
+            : targetPlace!.r_y;
+      // console.log("x0: " + x0 + " x1: " + x1 + " y0: " + y0 + " y1: " + y1);
+      console.log(d.branch_frequency);
       return (
         "M" +
         x0 +
@@ -531,12 +577,14 @@ d3.json("data.json", function (error, data: JSONDataType) {
       return `link${d.source}-${d.target}`;
     })
     .attr("d", path(pop_place))
-    .attr("stroke", "#ccc")
+    .attr("stroke", "#bbb")
     // .attr("stroke-opacity", .7)
     .style("stroke-width", function (d) {
       return Math.max(
         1,
-        circle_r * 2
+        d.branch_frequency
+          ? (circle_r * 2 * d.branch_frequency) / 100
+          : circle_r * 2
         // ((circle_r * 2 * data.Pnum[0].value) / Pnumsum) * 2 * 0.7
       );
     })
@@ -573,7 +621,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
       return `link2_${d.source}-${d.target}`;
     })
     .attr("d", path(pop_place2))
-    .attr("stroke", "#ccc")
+    .attr("stroke", "#bbb")
     // .attr("stroke-opacity", .7)
     .style("stroke-width", function (d) {
       return Math.max(
@@ -894,7 +942,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
     });
     const uniq = [...new Set(new_orders)];
     if (uniq.length == 1) {
-      console.log(uniq[0]);
+      // console.log(uniq[0]);
       return uniq[0];
     } else {
       return find_junction(uniq);
@@ -919,7 +967,6 @@ d3.json("data.json", function (error, data: JSONDataType) {
       );
       const target_order = find_junction(orders);
       c_line = place.find((order) => order.id == target_order.id)!.r_y;
-      console.log(c_line);
     }
 
     // const c_line = height / 2;

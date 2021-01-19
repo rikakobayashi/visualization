@@ -34,6 +34,7 @@
       "pre_item_id": [1],
       "next_item_id": [4],
       "frequency": 86,
+      "branch_frequency": 42,
       "isGroup": true
     },
     {
@@ -47,6 +48,7 @@
       "pre_item_id": [1],
       "next_item_id": [4],
       "frequency": 83,
+      "branch_frequency": 57,
       "isGroup": true
     },
     {
@@ -91,7 +93,7 @@
       "order_explain": "start",
       "order_name": "",
       "code": "",
-      "day": "",
+      "day": "1",
       "time_interval": [93],
       "pre_item_id": [6],
       "next_item_id": [8, 9],
@@ -105,10 +107,11 @@
       "order_explain": "",
       "order_name": "",
       "code": "",
-      "day": "",
+      "day": "1",
       "frequency": 93,
       "pre_item_id": [7],
       "next_item_id": [10],
+      "branch_frequency": 72,
       "isInjection": true
     },
     {
@@ -117,10 +120,11 @@
       "order_explain": "",
       "order_name": "",
       "code": "",
-      "day": "",
+      "day": "1",
       "frequency": 93,
       "pre_item_id": [7],
       "next_item_id": [11],
+      "branch_frequency": 27,
       "isInjection": true
     },
     {
@@ -129,10 +133,11 @@
       "order_explain": "",
       "order_name": "",
       "code": "",
-      "day": "",
+      "day": "1",
       "frequency": 93,
       "pre_item_id": [8],
       "next_item_id": [12],
+      "branch_frequency": 72,
       "isInjection": true
     },
     {
@@ -141,10 +146,11 @@
       "order_explain": "",
       "order_name": "",
       "code": "",
-      "day": "",
+      "day": "1",
       "frequency": 93,
       "pre_item_id": [9],
       "next_item_id": [12],
+      "branch_frequency": 27,
       "isInjection": true
     },
     {
@@ -153,7 +159,7 @@
       "order_explain": "",
       "order_name": "",
       "code": "",
-      "day": "",
+      "day": "1",
       "frequency": 100,
       "pre_item_id": [10, 11],
       "next_item_id": [-1]
