@@ -20,6 +20,7 @@ interface OrderDataType {
   code: string;
   day: string;
   frequency: number;
+  frequency_of_all?: number;
   next_item_id: Array<number>;
   pre_item_id: Array<number>;
   factor?: string[];
@@ -81,7 +82,7 @@ interface LinksType {
 
 d3.json("data.json", function (error, data: JSONDataType) {
   const N1 = 8;
-  const circle_r = 23;
+  const circle_r = 25;
   const link_length = 203; //文字が重なる場合はここの値を変更
   const margin = 110; // 全体が入るようにノードを右にずらす
   let width = N1 * (link_length + circle_r) + 500; // 最終的に右端のノードに合わせる
@@ -104,6 +105,8 @@ d3.json("data.json", function (error, data: JSONDataType) {
   let height_s = 0;
 
   let isRecommend: boolean = false;
+
+  let showFrequencyOfAll: boolean = false;
 
   const find_order_by_id = (id: number): OrderDataType | undefined => {
     return data.order_all.find((order) => order.id == id);
@@ -184,6 +187,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
           ..._order,
           id: order.id,
           frequency: order.frequency,
+          frequency_of_all: order.frequency_of_all,
           next_item_id: order.next_item_id,
           pre_item_id: order.pre_item_id,
           r_x: x_place(order.pre_item_id, order.time_interval),
@@ -497,8 +501,7 @@ d3.json("data.json", function (error, data: JSONDataType) {
     .append("svg")
     .attr("width", width)
     .attr("height", height);
-  //
-  //
+
   //sankeyチャートの表示
 
   const units = "人";
@@ -1087,6 +1090,28 @@ d3.json("data.json", function (error, data: JSONDataType) {
 
   console.log(variants);
   const factors: LinksType[] = [];
+
+  d3.select("#changeFrequency").on("click", function (button: EventTarget) {
+    showFrequencyOfAll = !showFrequencyOfAll;
+    if (showFrequencyOfAll) {
+      d3.select(button).text("全患者中の出現率を表示");
+    } else {
+      d3.select(button).text("分岐に対応する患者中の出現率を表示");
+    }
+    const nodes = d3.selectAll(".node");
+    const branchNodes = nodes.filter((node) => {
+      return !!find_order_by_id(node.id)?.frequency_of_all;
+    });
+    if (showFrequencyOfAll) {
+      branchNodes.select("circle").attr("r", (d) => {
+        return (d.frequency_of_all / 100) ** 1.2 * circle_r;
+      });
+    } else {
+      branchNodes.select("circle").attr("r", (d) => {
+        return (d.frequency / 100) ** 1.2 * circle_r;
+      });
+    }
+  });
 
   // variants.forEach((variant, index) => {
   //   console.log(variant);
