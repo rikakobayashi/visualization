@@ -82,14 +82,2513 @@ eval("\n\nexports.decode = exports.parse = __webpack_require__(/*! ./decode */ \
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 "use strict";
-eval("\nvar __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {\n    if (k2 === undefined) k2 = k;\n    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });\n}) : (function(o, m, k, k2) {\n    if (k2 === undefined) k2 = k;\n    o[k2] = m[k];\n}));\nvar __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {\n    Object.defineProperty(o, \"default\", { enumerable: true, value: v });\n}) : function(o, v) {\n    o[\"default\"] = v;\n});\nvar __importStar = (this && this.__importStar) || function (mod) {\n    if (mod && mod.__esModule) return mod;\n    var result = {};\n    if (mod != null) for (var k in mod) if (k !== \"default\" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);\n    __setModuleDefault(result, mod);\n    return result;\n};\nvar __importDefault = (this && this.__importDefault) || function (mod) {\n    return (mod && mod.__esModule) ? mod : { \"default\": mod };\n};\nObject.defineProperty(exports, \"__esModule\", ({ value: true }));\n//Constants for the SVG\nconst d3 = __importStar(__webpack_require__(/*! d3 */ \"./node_modules/d3/d3.js\"));\nconst data_json_1 = __importDefault(__webpack_require__(/*! ./json/data.json */ \"./src/json/data.json\"));\nconst patient1_json_1 = __importDefault(__webpack_require__(/*! ./json/patient1.json */ \"./src/json/patient1.json\"));\nconst patient2_json_1 = __importDefault(__webpack_require__(/*! ./json/patient2.json */ \"./src/json/patient2.json\"));\nconst patient3_json_1 = __importDefault(__webpack_require__(/*! ./json/patient3.json */ \"./src/json/patient3.json\"));\nconst patient4_json_1 = __importDefault(__webpack_require__(/*! ./json/patient4.json */ \"./src/json/patient4.json\"));\nconst querystring_1 = __webpack_require__(/*! querystring */ \"./node_modules/querystring/index.js\");\nconst data = data_json_1.default;\nconst params = querystring_1.parse(location.search.substring(1));\nif (params.type === \"tur-bt\") {\n    console.log(\"tur-bt\");\n}\nconst patientData = params.patient === \"1\"\n    ? patient1_json_1.default\n    : params.patient === \"2\"\n        ? patient2_json_1.default\n        : params.patient === \"3\"\n            ? patient3_json_1.default\n            : params.patient === \"4\"\n                ? patient4_json_1.default\n                : patient2_json_1.default;\nconst PatientData = patientData.patient_orders;\n// d3.json(\"./json/data.json\", function (error, data: JSONDataType) {\nconst N1 = 8;\nconst circle_r = 25;\nconst link_length = 203; //文字が重なる場合はここの値を変更\nconst margin = 110; // 全体が入るようにノードを右にずらす\nlet width = N1 * (link_length + circle_r) + 500; // 最終的に右端のノードに合わせる\nconst height = 1000;\nconst graph = {\n    orders: [],\n    links: [],\n};\nconst graph2 = {\n    orders: [],\n    links: [],\n};\nconst place = []; //nodeの中心位置を記録する{r_x,r_y}\nconst place2 = []; //nodeの中心位置を記録する{r_x,r_y}\nconst dataTypes4Color = [];\nlet height_s = 0;\nlet isRecommend = false;\nlet showFrequencyOfAll = false;\nconst find_order_by_id = (id) => {\n    return data.order_all.find((order) => order.id == id);\n};\nconst x_place = (pre_item_ids, time_interval) => {\n    const pre_item = pre_item_ids.length === 1\n        ? place.find((p) => p.id == pre_item_ids[0])\n        : pre_item_ids.map((pre_item_id) => place.find((p) => p.id == pre_item_id));\n    const min_length = 100;\n    const max_length = link_length * 3;\n    if (!pre_item) {\n        return link_length;\n    }\n    else if (Array.isArray(pre_item)) {\n        // return pre_item.r_x + link_length;\n        const ave_time_interval = time_interval?.reduce((acc, cur) => acc + cur);\n        const length = ave_time_interval\n            ? (ave_time_interval / time_interval.length) * 0.6 + link_length * 0.4\n            : link_length;\n        return (pre_item[0].r_x +\n            (length > max_length\n                ? max_length\n                : length < min_length\n                    ? min_length\n                    : length));\n    }\n    else {\n        const length = time_interval\n            ? time_interval[0] * 0.6 + link_length * 0.4\n            : link_length;\n        return (pre_item.r_x +\n            (length > max_length\n                ? max_length\n                : length < min_length\n                    ? min_length\n                    : length));\n    }\n};\nconst push_graph_orders = (id, seq_number, seq_length, seq_index) => {\n    if (id == -1) {\n        width = place[place.length - 1].r_x + margin;\n        return;\n    }\n    const order = data.order_all.find((order) => order.id == id);\n    if (!order)\n        return;\n    if (graph.orders.find((order) => order.id == id))\n        return;\n    // グループの場合\n    if (order.isGroup) {\n        // パスが通る座標\n        place.push({\n            id: order.id,\n            r_x: x_place(order.pre_item_id, order.time_interval),\n            r_y: push_place(seq_length, seq_index, order.pre_item_id, data.groups[order.order_type].length),\n        });\n        data.groups[order.order_type].forEach((_order, index) => {\n            // 各オーダーが通る座標\n            graph.orders.push({\n                ..._order,\n                id: order.id,\n                frequency: order.frequency,\n                frequency_of_all: order.frequency_of_all,\n                next_item_id: order.next_item_id,\n                pre_item_id: order.pre_item_id,\n                r_x: x_place(order.pre_item_id, order.time_interval),\n                r_y: push_place(seq_length, seq_index, order.pre_item_id, data.groups[order.order_type].length) -\n                    (60 * (data.groups[order.order_type].length - 1)) / 2 +\n                    60 * index,\n            });\n        });\n        // 普通のオーダーの場合\n    }\n    else {\n        // パスが通る座標\n        place.push({\n            id: order.id,\n            r_x: x_place(order.pre_item_id, order.time_interval),\n            r_y: push_place(seq_length, seq_index, order.pre_item_id),\n        });\n        // 各オーダーが通る座標\n        graph.orders.push({\n            ...order,\n            r_x: x_place(order.pre_item_id, order.time_interval),\n            r_y: push_place(seq_length, seq_index, order.pre_item_id),\n        });\n    }\n    order.next_item_id.forEach((next_item_id, next_index) => {\n        push_graph_orders(next_item_id, seq_number + 1, order.next_item_id.length, next_index);\n    });\n};\ndata.order_all.forEach((orders_by_seq, seq_index) => {\n    // placeとgraph.ordersを定義\n    push_graph_orders(0, 0, 1, 1);\n    if (orders_by_seq.next_item_id[0] !== -1) {\n        // linksを定義\n        orders_by_seq.next_item_id.forEach((id, index) => {\n            console.log(find_order_by_id(id)?.pre_item_id.indexOf(orders_by_seq.id));\n            graph.links.push({\n                source: orders_by_seq.id,\n                target: id,\n                value: 40,\n                factor: orders_by_seq.factor ? orders_by_seq.factor[index] : \"\",\n                branch_frequency: orders_by_seq.branch_frequency ||\n                    find_order_by_id(id)?.branch_frequency ||\n                    undefined,\n                branch_position: orders_by_seq.branch_frequency &&\n                    find_order_by_id(id)?.branch_frequency\n                    ? undefined\n                    : orders_by_seq.branch_frequency\n                        ? find_order_by_id(id)?.pre_item_id.indexOf(orders_by_seq.id)\n                        : find_order_by_id(id)?.branch_frequency\n                            ? index\n                            : undefined,\n            });\n        });\n    }\n    // height_sを定義\n    // if (max_order_length < orders_by_seq.length) {\n    //   height_s =\n    //     push_place(orders_by_seq.length, 0) -\n    //     push_place(orders_by_seq.length, orders_by_seq.length);\n    //   max_order_length = orders_by_seq.length;\n    // }\n    height_s = 300;\n});\nPatientData.forEach((order, index) => {\n    place2.push({\n        id: index,\n        r_x: link_length * (index + 1),\n        r_y: height * 0.7,\n    });\n    graph2.orders.push({\n        id: index,\n        order_type: order.ordertypevalue,\n        order_explain: order.orderexplain,\n        order_name: order.productname,\n        code: order.efficacycode,\n        day: \"\",\n        frequency: 100,\n        pre_item_id: [index - 1],\n        next_item_id: PatientData[index + 1] ? [index + 1] : [-1],\n        r_x: link_length * (index + 1),\n        r_y: height * 0.7,\n    });\n    if (PatientData[index + 1]) {\n        graph2.links.push({\n            source: index,\n            target: index + 1,\n            value: 40,\n        });\n    }\n    if (width < link_length * (index + 1)) {\n        width = link_length * (index + 1) + margin;\n    }\n});\nconst allPathId = [];\nconst getAllPathId = (id, arr) => {\n    const targetOrder = data.order_all.find((order) => order.id == id);\n    if (!targetOrder) {\n        return allPathId.push(arr.concat());\n    }\n    arr.push(id);\n    targetOrder?.next_item_id.forEach((id) => {\n        getAllPathId(id, arr.concat());\n    });\n};\ngetAllPathId(0, []);\nconsole.log(allPathId.concat());\nconsole.log(JSON.parse(JSON.stringify(graph)));\nconsole.log(JSON.parse(JSON.stringify(place)));\nconsole.log(JSON.parse(JSON.stringify(graph2)));\nconsole.log(JSON.parse(JSON.stringify(place2)));\nconst patientPath = [];\nlet i = 0;\nlet j = 0;\nlet i_progress_count = 0;\nlet j_progress_count = 0;\nwhile (data.order_all[i] && PatientData[j]) {\n    if (data.order_all[i].isGroup) {\n        const groupOrders = data.groups[data.order_all[i].order_type];\n    }\n    if (data.order_all[i].order_type === PatientData[j].ordertypevalue) {\n        patientPath.push(data.order_all[i].id);\n        i++;\n        j++;\n        i_progress_count = 0;\n        j_progress_count = 0;\n        continue;\n    }\n    else {\n        if (PatientData[j + 1]?.ordertypevalue === data.order_all[i]?.order_type) {\n            j++;\n            j_progress_count++;\n        }\n        else if (data.order_all[i + 1]?.order_type === data.order_all[j]?.order_type) {\n            i++;\n            i_progress_count++;\n        }\n        else {\n            j++;\n        }\n    }\n}\nconsole.log(patientPath.concat());\nfunction getAllPathName(path_id_array) {\n    return path_id_array.map((id) => {\n        const order = find_order_by_id(id);\n        if (order.isGroup || order.isInjection) {\n            const group_orders = data.groups[order.order_type];\n            return group_orders.map((group_order) => group_order.order_type);\n        }\n        else {\n            return order.order_type;\n        }\n    });\n}\nconst passedPath = allPathId.reduce((acc, cur) => {\n    if (acc.length === 0) {\n        acc = cur;\n    }\n    if (getConcordance(acc, PatientData) < getConcordance(cur, PatientData)) {\n        acc = cur;\n    }\n    return acc;\n}, []);\nconsole.log(passedPath);\nfunction getConcordance(all_path_array, patient_orders) {\n    const path_names = getAllPathName(all_path_array).flat();\n    let count = 0;\n    path_names.forEach((name) => {\n        if (patient_orders.find((order) => order.ordertypevalue === name)) {\n            count++;\n        }\n    });\n    return count / path_names.length;\n}\nfunction getMatchPath(path_id_array, patient_orders) {\n    const path_name_array = getAllPathName(path_id_array);\n    let _i = 0;\n    let _j = 1;\n    const matchedPath = [0];\n    while (path_name_array[_j]) {\n        if (!patient_orders[_i])\n            break;\n        const path_name = path_name_array[_j];\n        if (Array.isArray(path_name)) {\n            const group_order = patient_orders.slice(_i, _i + path_name.length);\n            if (JSON.stringify(path_name.sort()) ==\n                JSON.stringify(group_order.map((order) => order.ordertypevalue).sort())) {\n                console.log(path_name);\n                matchedPath.push(path_id_array[_j]);\n                _i += path_name.length;\n                _j++;\n                continue;\n            }\n            else if (path_name.every((name) => patient_orders.find((order) => order.ordertypevalue === name)\n                ? true\n                : false)) {\n                _i++;\n            }\n            else {\n                // TODO\n                matchedPath.push(path_id_array[_j]);\n                _j++;\n                continue;\n            }\n        }\n        else {\n            if (path_name === patient_orders[_i].ordertypevalue) {\n                matchedPath.push(path_id_array[_j]);\n                _i++;\n                _j++;\n                console.log(path_name);\n                continue;\n            }\n            else if (\n            // 頻出パスが多い、患者のパスが飛んでいる\n            path_name_array.indexOf(patient_orders[_i].ordertypevalue) !== -1) {\n                const next_order_index = path_name_array.indexOf(patient_orders[_i + 1].ordertypevalue);\n                if (next_order_index !== -1 &&\n                    path_name_array.indexOf(patient_orders[_i].ordertypevalue) <\n                        next_order_index) {\n                    matchedPath.push(path_id_array[_j]);\n                    _j++;\n                    continue;\n                }\n                else {\n                    _i++;\n                }\n            }\n            else if (patient_orders.find((order) => order.ordertypevalue === path_name)) {\n                _i++;\n            }\n            else {\n                // matchedPath.push(path_id_array[_j]);\n                _i++;\n                _j++;\n            }\n        }\n    }\n    return matchedPath;\n}\nconst matchedPath = getMatchPath(passedPath, PatientData);\nconsole.log(matchedPath);\n//Set up the color scale\nconst color = d3.scale.category20();\n//Append a SVG to the body of the html page. Assign this SVG as an object to svg\nconst svg = d3\n    .select(\"body\")\n    .append(\"svg\")\n    .attr(\"width\", width)\n    .attr(\"height\", height);\n//sankeyチャートの表示\nconst units = \"人\";\nconst formatNumber = d3.format(\",.0f\"), // zero decimal places\nformat = function (d) {\n    return formatNumber(d) + \" \" + units;\n};\nconst path = function (pop_place) {\n    let curvature = 0.5;\n    function link(d, i) {\n        const targetPlace = pop_place(d.target);\n        const sourcePlace = pop_place(d.source);\n        const targetOrder = find_order_by_id(d.target);\n        const sourceOrder = find_order_by_id(d.source);\n        const x0 = sourcePlace.r_x, x1 = targetPlace.r_x, xi = d3.interpolateNumber(x0, x1), x2 = xi(curvature), x3 = xi(1 - curvature), y0 = targetOrder?.branch_frequency && d.branch_position === 0\n            ? sourcePlace.r_y - (circle_r * (100 - d.branch_frequency)) / 100\n            : targetOrder?.branch_frequency && d.branch_position === 1\n                ? sourcePlace.r_y + (circle_r * (100 - d.branch_frequency)) / 100\n                : sourcePlace.r_y, y1 = sourceOrder?.branch_frequency && d.branch_position === 0\n            ? targetPlace.r_y - (circle_r * (100 - d.branch_frequency)) / 100\n            : sourceOrder?.branch_frequency && d.branch_position === 1\n                ? targetPlace.r_y + (circle_r * (100 - d.branch_frequency)) / 100\n                : targetPlace.r_y;\n        return (\"M\" +\n            x0 +\n            \",\" +\n            y0 +\n            \"C\" +\n            x2 +\n            \",\" +\n            y0 +\n            \" \" +\n            x3 +\n            \",\" +\n            y1 +\n            \" \" +\n            x1 +\n            \",\" +\n            y1);\n    }\n    link.curvature = function (_) {\n        if (!arguments.length)\n            return curvature;\n        curvature = +_;\n        return link;\n    };\n    return link;\n};\n// パスを出力\nlet link1_data = svg.append(\"g\").selectAll(\".link1\").data(graph.links).enter();\nconst link1 = link1_data\n    .append(\"path\")\n    .attr(\"class\", \"link1\")\n    .attr(\"id\", function (d) {\n    return `link${d.source}-${d.target}`;\n})\n    .attr(\"d\", path(pop_place))\n    .attr(\"stroke\", \"#bbb\")\n    // .attr(\"stroke-opacity\", .7)\n    .style(\"stroke-width\", function (d) {\n    return Math.max(1, d.branch_frequency\n        ? (circle_r * 2 * d.branch_frequency) / 100\n        : circle_r * 2\n    // ((circle_r * 2 * data.Pnum[0].value) / Pnumsum) * 2 * 0.7\n    );\n})\n    .attr(\"fill\", \"none\");\nlink1_data\n    .append(\"text\")\n    .attr(\"class\", \"link1_text\")\n    .attr(\"font-size\", 14)\n    .attr(\"x\", function (d) {\n    return (pop_place(d.source).r_x + pop_place(d.target).r_x) / 2;\n})\n    .attr(\"y\", function (d) {\n    return (pop_place(d.source).r_y + pop_place(d.target).r_y) / 2;\n})\n    .style(\"text-anchor\", \"middle\")\n    .style(\"dominant-baseline\", \"central\")\n    .text(function (d) {\n    if (d.factor)\n        return d.factor;\n    return \"\";\n});\nlet link2_data = svg.append(\"g\").selectAll(\".link2\").data(graph2.links).enter();\n// throw Error();\nconst link2 = link2_data\n    .append(\"path\")\n    .attr(\"class\", \"link2\")\n    .attr(\"id\", function (d) {\n    return `link2_${d.source}-${d.target}`;\n})\n    .attr(\"d\", path(pop_place2))\n    .attr(\"stroke\", \"#bbb\")\n    // .attr(\"stroke-opacity\", .7)\n    .style(\"stroke-width\", function (d) {\n    return Math.max(1, circle_r * 2\n    // ((circle_r * 2 * data.Pnum[0].value) / Pnumsum) * 2 * 0.7\n    );\n})\n    .attr(\"fill\", \"none\");\nlink2_data\n    .append(\"text\")\n    .attr(\"class\", \"link2_text\")\n    .attr(\"font-size\", 14)\n    .attr(\"x\", function (d) {\n    return (pop_place2(d.source).r_x + pop_place2(d.target).r_x) / 2;\n})\n    .attr(\"y\", function (d) {\n    return (pop_place2(d.source).r_y + pop_place2(d.target).r_y) / 2;\n})\n    .style(\"text-anchor\", \"middle\")\n    .style(\"dominant-baseline\", \"central\")\n    .text(function (d) {\n    if (d.factor)\n        return d.factor;\n    return \"\";\n});\n//Do the same with the circles for the nodes - no\nconst node = svg\n    .selectAll(\".node\")\n    .data(graph.orders)\n    .enter()\n    .append(\"g\")\n    .attr(\"class\", \"node\")\n    .attr(\"id\", function (d, i) {\n    return i;\n})\n    .on(\"click\", function () {\n    if (d3.select(this).select(\".info_text1\").style(\"visibility\") == \"visible\") {\n        d3.select(this).select(\".info_text1\").style(\"visibility\", \"hidden\");\n        d3.select(this).select(\".info_text2\").style(\"visibility\", \"hidden\");\n        d3.select(this).select(\".info_text3\").style(\"visibility\", \"hidden\");\n        d3.select(this).select(\".info_rect\").style(\"visibility\", \"hidden\");\n    }\n    else if (d3.select(this).select(\".info_text1\").style(\"visibility\") == \"hidden\") {\n        d3.select(this).select(\".info_text1\").style(\"visibility\", \"visible\");\n        d3.select(this).select(\".info_text2\").style(\"visibility\", \"visible\");\n        d3.select(this).select(\".info_text3\").style(\"visibility\", \"visible\");\n        d3.select(this).select(\".info_rect\").style(\"visibility\", \"visible\");\n    }\n});\nnode\n    .append(\"circle\")\n    .attr(\"r\", function (d) {\n    return (d.frequency / 100) ** 1.2 * circle_r;\n})\n    .style(\"fill\", function (d, i) {\n    return color(String(colorset(d.order_type)));\n})\n    .attr(\"cx\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"cy\", function (d, i) {\n    return d.r_y;\n})\n    .append(\"title\")\n    .text(function (d) {\n    return `出現率: ${d.frequency}%`;\n});\nnode\n    .append(\"text\")\n    .attr(\"class\", \"node_text\")\n    .attr(\"font-size\", 13)\n    .style(\"text-anchor\", \"middle\")\n    .text(function (d) {\n    return \"[\" + d.order_type + \"/ day : \" + d.day + \"]\";\n})\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 30;\n});\nnode\n    .append(\"rect\")\n    .style(\"visibility\", \"hidden\")\n    .style(\"fill\", function (d, i) {\n    return color(String(colorset(d.order_type)));\n})\n    .attr(\"class\", \"info_rect\")\n    .attr(\"fill-opacity\", \".7\")\n    .attr(\"width\", 200)\n    .attr(\"height\", 80)\n    .attr(\"stroke\", \"black\")\n    .attr(\"stroke-width\", \"0.5pt\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x - 105;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 120;\n});\nnode\n    .append(\"text\")\n    .style(\"visibility\", \"hidden\")\n    .attr(\"class\", \"info_text1\")\n    .attr(\"font-size\", 15)\n    .text(function (d) {\n    return d.order_explain;\n})\n    .style(\"text-anchor\", \"middle\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 100;\n});\nnode\n    .append(\"text\")\n    .style(\"visibility\", \"hidden\")\n    .attr(\"class\", \"info_text2\")\n    .attr(\"font-size\", 15)\n    .text(function (d) {\n    if (d.order_name == \"\")\n        return \"null\";\n    return d.order_name;\n})\n    .style(\"text-anchor\", \"middle\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 80;\n});\nnode\n    .append(\"text\")\n    .style(\"visibility\", \"hidden\")\n    .attr(\"class\", \"info_text3\")\n    .attr(\"font-size\", 15)\n    .text(function (d) {\n    if (d.code == \"\")\n        return \"null\";\n    return d.code;\n})\n    .style(\"text-anchor\", \"middle\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 60;\n});\nconst node2 = svg\n    .selectAll(\".node2\")\n    .data(graph2.orders)\n    .enter()\n    .append(\"g\")\n    .attr(\"class\", \"node2\")\n    .attr(\"id\", function (d, i) {\n    return `node2-${i}`;\n})\n    .on(\"click\", function () {\n    if (d3.select(this).select(\".info2_text1\").style(\"visibility\") == \"visible\") {\n        d3.select(this).select(\".info2_text1\").style(\"visibility\", \"hidden\");\n        d3.select(this).select(\".info2_text2\").style(\"visibility\", \"hidden\");\n        d3.select(this).select(\".info2_text3\").style(\"visibility\", \"hidden\");\n        d3.select(this).select(\".info2_rect\").style(\"visibility\", \"hidden\");\n    }\n    else if (d3.select(this).select(\".info2_text1\").style(\"visibility\") == \"hidden\") {\n        d3.select(this).select(\".info2_text1\").style(\"visibility\", \"visible\");\n        d3.select(this).select(\".info2_text2\").style(\"visibility\", \"visible\");\n        d3.select(this).select(\".info2_text3\").style(\"visibility\", \"visible\");\n        d3.select(this).select(\".info2_rect\").style(\"visibility\", \"visible\");\n    }\n});\nnode2\n    .append(\"circle\")\n    .attr(\"r\", function (d) {\n    return circle_r;\n})\n    .style(\"fill\", function (d, i) {\n    return color(String(colorset(d.order_type)));\n})\n    .attr(\"cx\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"cy\", function (d, i) {\n    return d.r_y;\n})\n    .append(\"title\")\n    .text(function (d) {\n    return `出現率: ${d.frequency}%`;\n});\nnode2\n    .append(\"text\")\n    .attr(\"class\", \"node2_text\")\n    .attr(\"font-size\", 13)\n    .style(\"text-anchor\", \"middle\")\n    .text(function (d) {\n    return \"[\" + d.order_type + \"/ day : \" + d.day + \"]\";\n})\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 30;\n});\nnode2\n    .append(\"rect\")\n    .style(\"visibility\", \"hidden\")\n    .style(\"fill\", function (d, i) {\n    return color(String(colorset(d.order_type)));\n})\n    .attr(\"class\", \"info2_rect\")\n    .attr(\"fill-opacity\", \".7\")\n    .attr(\"width\", 200)\n    .attr(\"height\", 80)\n    .attr(\"stroke\", \"black\")\n    .attr(\"stroke-width\", \"0.5pt\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x - 105;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 120;\n});\nnode2\n    .append(\"text\")\n    .style(\"visibility\", \"hidden\")\n    .attr(\"class\", \"info2_text1\")\n    .attr(\"font-size\", 15)\n    .text(function (d) {\n    return d.order_explain;\n})\n    .style(\"text-anchor\", \"middle\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 100;\n});\nnode2\n    .append(\"text\")\n    .style(\"visibility\", \"hidden\")\n    .attr(\"class\", \"info2_text2\")\n    .attr(\"font-size\", 15)\n    .text(function (d) {\n    if (d.order_name == \"\")\n        return \"null\";\n    return d.order_name;\n})\n    .style(\"text-anchor\", \"middle\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 80;\n});\nnode2\n    .append(\"text\")\n    .style(\"visibility\", \"hidden\")\n    .attr(\"class\", \"info2_text3\")\n    .attr(\"font-size\", 15)\n    .text(function (d) {\n    if (d.code == \"\")\n        return \"null\";\n    return d.code;\n})\n    .style(\"text-anchor\", \"middle\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 60;\n});\n//---Insert-------\nsvg\n    .append(\"defs\")\n    .selectAll(\"marker\")\n    .data([\"suit\", \"licensing\", \"resolved\"])\n    .enter()\n    .append(\"marker\")\n    .attr(\"id\", function (d) {\n    return d;\n})\n    .attr(\"viewBox\", \"0 -5 10 10\")\n    .attr(\"refX\", 10)\n    .attr(\"refY\", 0)\n    .attr(\"markerWidth\", 50)\n    .attr(\"markerHeight\", 10)\n    .attr(\"orient\", \"auto\")\n    .append(\"path\")\n    .attr(\"d\", \"M0,-5L10,0L0,5 L10,0 L0, -5\")\n    .style(\"stroke\", \"black\");\nfunction find_junction(orders) {\n    const new_orders = orders.map((order) => {\n        let target = order;\n        while (target.next_item_id.length == 1) {\n            if (target.pre_item_id.length == 1) {\n                target = find_order_by_id(target.pre_item_id[0]);\n            }\n            else {\n                //\n            }\n        }\n        return target;\n    });\n    const uniq = [...new Set(new_orders)];\n    if (uniq.length == 1) {\n        return uniq[0];\n    }\n    else {\n        return find_junction(uniq);\n    }\n}\nfunction push_place(parallel, j, pre_order_ids, group_num) {\n    let c_line = height * 0.36;\n    if (pre_order_ids.length == 1) {\n        const pre_order = place.find((order) => order.id == pre_order_ids[0]);\n        if (!pre_order || pre_order.id == 0)\n            return c_line;\n        c_line = pre_order.r_y;\n    }\n    else if (pre_order_ids.length > 1) {\n        let orders = pre_order_ids.map((pre_order_id) => find_order_by_id(pre_order_id));\n        const target_order = find_junction(orders);\n        c_line = place.find((order) => order.id == target_order.id).r_y;\n    }\n    // const c_line = height / 2;\n    if (parallel == 1) {\n        return c_line;\n    }\n    if (parallel % 2 == 0) {\n        if (j < parallel / 2)\n            return c_line + 75 + 150 * (j - parallel / 2) - (group_num ?? 0) * 15;\n        else\n            return c_line + 75 - 150 * (parallel / 2 - j) + (group_num ?? 0) * 15;\n    }\n    else {\n        parallel = parallel - 1;\n        if (j < parallel / 2)\n            return c_line + 150 + 150 * (j - parallel / 2);\n        else\n            return c_line + 150 - 150 * (parallel / 2 - j);\n    }\n    return 100;\n}\nfunction pop_place(id) {\n    return place.find((place) => place.id == id);\n}\nfunction pop_place2(id) {\n    return place2.find((place) => place.id == id);\n}\nfunction find_link(id) {\n    return graph.links[id];\n}\nfunction colorset(type) {\n    //nodeの色の決定\n    const number = dataTypes4Color.indexOf(type) !== -1\n        ? dataTypes4Color.indexOf(type)\n        : dataTypes4Color.push(type) - 1;\n    return number;\n}\nfunction colorset2(seqno) {\n    //seqの色の決定\n    if (seqno % 10 == 1) {\n        return 1;\n    }\n    else if (seqno % 10 == 2) {\n        return 2;\n    }\n    else if (seqno % 10 == 3) {\n        return 3;\n    }\n    else if (seqno % 10 == 4) {\n        return 4;\n    }\n    else if (seqno % 10 == 5) {\n        return 5;\n    }\n    else if (seqno % 10 == 6) {\n        return 6;\n    }\n    else if (seqno % 10 == 7) {\n        return 7;\n    }\n    else if (seqno % 10 == 8) {\n        return 8;\n    }\n    else if (seqno % 10 == 9) {\n        return 9;\n    }\n    else {\n        return 0;\n    }\n}\nd3.select(\"#clearButton\").on(\"click\", function () {\n    d3.selectAll(\".info_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".info_text1\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".info_text2\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".info_text3\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk1_text\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk1_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk2_text\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk2_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost1_text\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost1_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost2_text\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost2_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".rect1\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".rect2\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".rect3\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".rect4\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".text1\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".text2\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".text3\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".text4\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk1_ptext\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk2_ptext\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost1_ptext\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost2_ptext\").style(\"visibility\", \"hidden\");\n});\n//---End Insert---\nconst branch_orders = data.order_all.filter((order) => {\n    return order.next_item_id.length > 1;\n});\nconst variants = [];\nconst selection = [];\nbranch_orders.forEach((branch_order) => {\n    variants.push(graph.links.filter((rec_link) => rec_link.source == branch_order.id));\n});\npassedPath.forEach((p, i) => {\n    // if (!path[i + 1]) return;\n    d3.select(`#link${p}-${passedPath[i + 1]}`).attr(\"stroke\", \"thistle\");\n});\nmatchedPath.forEach((p, i) => {\n    // if (!path[i + 1]) return;\n    d3.select(`#link${p}-${matchedPath[i + 1]}`).attr(\"stroke\", \"#bce2e8\");\n});\nconsole.log(variants);\nconst factors = [];\nd3.select(\"#changeFrequency\").on(\"click\", function (button) {\n    showFrequencyOfAll = !showFrequencyOfAll;\n    if (showFrequencyOfAll) {\n        d3.select(button).text(\"全患者中の出現率を表示\");\n    }\n    else {\n        d3.select(button).text(\"分岐に対応する患者中の出現率を表示\");\n    }\n    const nodes = d3.selectAll(\".node\");\n    const branchNodes = nodes.filter((node) => {\n        return !!find_order_by_id(node.id)?.frequency_of_all;\n    });\n    if (showFrequencyOfAll) {\n        branchNodes.select(\"circle\").attr(\"r\", (d) => {\n            return (d.frequency_of_all / 100) ** 1.2 * circle_r;\n        });\n    }\n    else {\n        branchNodes.select(\"circle\").attr(\"r\", (d) => {\n            return (d.frequency / 100) ** 1.2 * circle_r;\n        });\n    }\n});\n// variants.forEach((variant, index) => {\n//   console.log(variant);\n//   d3.select(\"#buttons\")\n//     .selectAll(`button${index}`)\n//     .data(variant)\n//     .enter()\n//     .append(\"button\")\n//     .text(function (d) {\n//       return d.factor ?? \"\";\n//     })\n//     .on(\"click\", function (d) {\n//       selection.push(d.factor);\n//       const unselected_factors = variants\n//         .find((variant) => variant.includes(d))\n//         ?.filter((path) => path !== d);\n//       unselected_factors?.forEach((path) => {\n//         const index = factors.indexOf(path);\n//         if (index == -1) return;\n//         factors.splice(index, 1);\n//       });\n//       factors.push(d);\n//       d3.selectAll(\".link1\").attr(\"stroke\", \"#ccc\");\n//       let paths = allPathId.concat();\n//       factors.forEach((link) => {\n//         paths = paths.filter((path) => path.includes(link.target));\n//       });\n//       console.log(paths);\n//       // const path = test2.find((ids) => ids.find((id) => id == d.target));\n//       paths?.forEach((path) =>\n//         path.forEach((p, i) => {\n//           if (!path[i + 1]) return;\n//           d3.select(`#link${p}-${path[i + 1]}`).attr(\"stroke\", \"thistle\");\n//         })\n//       );\n//     });\n//   d3.select(\"#buttons\").append(\"br\");\n// });\n// });\nconst onClick = () => {\n    if (document) {\n        const form = (document.getElementById(\"input_message\"));\n        const value = form.value;\n    }\n};\n\n\n//# sourceURL=webpack://Visualization_webpack/./src/index.ts?");
+eval("\nvar __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {\n    if (k2 === undefined) k2 = k;\n    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });\n}) : (function(o, m, k, k2) {\n    if (k2 === undefined) k2 = k;\n    o[k2] = m[k];\n}));\nvar __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {\n    Object.defineProperty(o, \"default\", { enumerable: true, value: v });\n}) : function(o, v) {\n    o[\"default\"] = v;\n});\nvar __importStar = (this && this.__importStar) || function (mod) {\n    if (mod && mod.__esModule) return mod;\n    var result = {};\n    if (mod != null) for (var k in mod) if (k !== \"default\" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);\n    __setModuleDefault(result, mod);\n    return result;\n};\nvar __importDefault = (this && this.__importDefault) || function (mod) {\n    return (mod && mod.__esModule) ? mod : { \"default\": mod };\n};\nObject.defineProperty(exports, \"__esModule\", ({ value: true }));\n//Constants for the SVG\nconst d3 = __importStar(__webpack_require__(/*! d3 */ \"./node_modules/d3/d3.js\"));\nconst data_json_1 = __importDefault(__webpack_require__(/*! ./json/tur-bt/data.json */ \"./src/json/tur-bt/data.json\"));\nconst patient1_json_1 = __importDefault(__webpack_require__(/*! ./json/tur-bt/patient1.json */ \"./src/json/tur-bt/patient1.json\"));\nconst patient2_json_1 = __importDefault(__webpack_require__(/*! ./json/tur-bt/patient2.json */ \"./src/json/tur-bt/patient2.json\"));\nconst patient3_json_1 = __importDefault(__webpack_require__(/*! ./json/tur-bt/patient3.json */ \"./src/json/tur-bt/patient3.json\"));\nconst patient4_json_1 = __importDefault(__webpack_require__(/*! ./json/tur-bt/patient4.json */ \"./src/json/tur-bt/patient4.json\"));\nconst data_json_2 = __importDefault(__webpack_require__(/*! ./json/rfa/data.json */ \"./src/json/rfa/data.json\"));\nconst patient1_json_2 = __importDefault(__webpack_require__(/*! ./json/rfa/patient1.json */ \"./src/json/rfa/patient1.json\"));\nconst patient2_json_2 = __importDefault(__webpack_require__(/*! ./json/rfa/patient2.json */ \"./src/json/rfa/patient2.json\"));\nconst patient3_json_2 = __importDefault(__webpack_require__(/*! ./json/rfa/patient3.json */ \"./src/json/rfa/patient3.json\"));\nconst data_json_3 = __importDefault(__webpack_require__(/*! ./json/hepatectomy/data.json */ \"./src/json/hepatectomy/data.json\"));\nconst patient1_json_3 = __importDefault(__webpack_require__(/*! ./json/hepatectomy/patient1.json */ \"./src/json/hepatectomy/patient1.json\"));\nconst patient2_json_3 = __importDefault(__webpack_require__(/*! ./json/hepatectomy/patient2.json */ \"./src/json/hepatectomy/patient2.json\"));\nconst patient3_json_3 = __importDefault(__webpack_require__(/*! ./json/hepatectomy/patient3.json */ \"./src/json/hepatectomy/patient3.json\"));\nconst querystring_1 = __webpack_require__(/*! querystring */ \"./node_modules/querystring/index.js\");\nconst params = querystring_1.parse(location.search.substring(1));\nconst data = params.type === \"tur-bt\"\n    ? data_json_1.default\n    : params.type === \"rfa\"\n        ? data_json_2.default\n        : params.type === \"hepatectomy\"\n            ? data_json_3.default\n            : data_json_1.default;\nconst patientData = params.type === \"tur-bt\"\n    ? params.patient === \"1\"\n        ? patient1_json_1.default\n        : params.patient === \"2\"\n            ? patient2_json_1.default\n            : params.patient === \"3\"\n                ? patient3_json_1.default\n                : params.patient === \"4\"\n                    ? patient4_json_1.default\n                    : null\n    : params.type === \"rfa\"\n        ? params.patient === \"1\"\n            ? patient1_json_2.default\n            : params.patient === \"2\"\n                ? patient2_json_2.default\n                : params.patient === \"3\"\n                    ? patient3_json_2.default\n                    : null\n        : params.type === \"hepatectomy\"\n            ? params.patient === \"1\"\n                ? patient1_json_3.default\n                : params.patient === \"2\"\n                    ? patient2_json_3.default\n                    : params.patient === \"3\"\n                        ? patient3_json_3.default\n                        : null\n            : null;\nconst PatientData = patientData?.patient_orders;\n// d3.json(\"./json/data.json\", function (error, data: JSONDataType) {\nconst N1 = 8;\nconst circle_r = 25;\nconst link_length = 203; //文字が重なる場合はここの値を変更\nconst margin = 110; // 全体が入るようにノードを右にずらす\nlet width = N1 * (link_length + circle_r) + 500; // 最終的に右端のノードに合わせる\nconst height = 500;\nconst height2 = 200;\nconst graph = {\n    orders: [],\n    links: [],\n};\nconst graph2 = {\n    orders: [],\n    links: [],\n};\nconst place = []; //nodeの中心位置を記録する{r_x,r_y}\nconst place2 = []; //nodeの中心位置を記録する{r_x,r_y}\nconst dataTypes4Color = [];\nlet height_s = 0;\nlet isRecommend = false;\nlet showFrequencyOfAll = false;\nconst find_order_by_id = (id) => {\n    return data.order_all.find((order) => order.id == id);\n};\nconst x_place = (pre_item_ids, time_interval) => {\n    const pre_item = pre_item_ids.length === 1\n        ? place.find((p) => p.id == pre_item_ids[0])\n        : pre_item_ids.map((pre_item_id) => place.find((p) => p.id == pre_item_id));\n    const min_length = 100;\n    const max_length = link_length * 3;\n    if (!pre_item) {\n        return link_length;\n    }\n    else if (Array.isArray(pre_item)) {\n        // return pre_item.r_x + link_length;\n        const ave_time_interval = time_interval?.reduce((acc, cur) => acc + cur);\n        const length = ave_time_interval\n            ? (ave_time_interval / time_interval.length) * 0.6 + link_length * 0.4\n            : link_length;\n        return (pre_item[0].r_x +\n            (length > max_length\n                ? max_length\n                : length < min_length\n                    ? min_length\n                    : length));\n    }\n    else {\n        const length = time_interval\n            ? time_interval[0] * 0.6 + link_length * 0.4\n            : link_length;\n        return (pre_item.r_x +\n            (length > max_length\n                ? max_length\n                : length < min_length\n                    ? min_length\n                    : length));\n    }\n};\nconst push_graph_orders = (id, seq_number, seq_length, seq_index) => {\n    if (id == -1) {\n        width = place[place.length - 1].r_x + margin;\n        return;\n    }\n    const order = data.order_all.find((order) => order.id == id);\n    if (!order)\n        return;\n    if (graph.orders.find((order) => order.id == id))\n        return;\n    // グループの場合\n    if (order.isGroup) {\n        // パスが通る座標\n        place.push({\n            id: order.id,\n            r_x: x_place(order.pre_item_id, order.time_interval),\n            r_y: push_place(seq_length, seq_index, order.pre_item_id, data.groups[order.order_type].length),\n        });\n        data.groups[order.order_type].forEach((_order, index) => {\n            // 各オーダーが通る座標\n            graph.orders.push({\n                ..._order,\n                id: order.id,\n                frequency: order.frequency,\n                frequency_of_all: order.frequency_of_all,\n                next_item_id: order.next_item_id,\n                pre_item_id: order.pre_item_id,\n                r_x: x_place(order.pre_item_id, order.time_interval),\n                r_y: push_place(seq_length, seq_index, order.pre_item_id, data.groups[order.order_type].length) -\n                    (60 * (data.groups[order.order_type].length - 1)) / 2 +\n                    60 * index,\n            });\n        });\n        // 普通のオーダーの場合\n    }\n    else {\n        // パスが通る座標\n        place.push({\n            id: order.id,\n            r_x: x_place(order.pre_item_id, order.time_interval),\n            r_y: push_place(seq_length, seq_index, order.pre_item_id),\n        });\n        // 各オーダーが通る座標\n        graph.orders.push({\n            ...order,\n            r_x: x_place(order.pre_item_id, order.time_interval),\n            r_y: push_place(seq_length, seq_index, order.pre_item_id),\n        });\n    }\n    order.next_item_id.forEach((next_item_id, next_index) => {\n        push_graph_orders(next_item_id, seq_number + 1, order.next_item_id.length, next_index);\n    });\n};\ndata.order_all.forEach((orders_by_seq, seq_index) => {\n    // placeとgraph.ordersを定義\n    push_graph_orders(0, 0, 1, 1);\n    if (orders_by_seq.next_item_id[0] !== -1) {\n        // linksを定義\n        orders_by_seq.next_item_id.forEach((id, index) => {\n            console.log(find_order_by_id(id)?.pre_item_id.indexOf(orders_by_seq.id));\n            graph.links.push({\n                source: orders_by_seq.id,\n                target: id,\n                value: 40,\n                factor: orders_by_seq.factor ? orders_by_seq.factor[index] : \"\",\n                branch_frequency: orders_by_seq.branch_frequency ||\n                    find_order_by_id(id)?.branch_frequency ||\n                    undefined,\n                branch_position: orders_by_seq.branch_frequency &&\n                    find_order_by_id(id)?.branch_frequency\n                    ? undefined\n                    : orders_by_seq.branch_frequency\n                        ? find_order_by_id(id)?.pre_item_id.indexOf(orders_by_seq.id)\n                        : find_order_by_id(id)?.branch_frequency\n                            ? index\n                            : undefined,\n            });\n        });\n    }\n    // height_sを定義\n    // if (max_order_length < orders_by_seq.length) {\n    //   height_s =\n    //     push_place(orders_by_seq.length, 0) -\n    //     push_place(orders_by_seq.length, orders_by_seq.length);\n    //   max_order_length = orders_by_seq.length;\n    // }\n    height_s = 300;\n});\nif (PatientData) {\n    PatientData.forEach((order, index) => {\n        place2.push({\n            id: index,\n            r_x: link_length * (index + 1),\n            r_y: height2 * 0.5,\n        });\n        graph2.orders.push({\n            id: index,\n            order_type: order.ordertypevalue,\n            order_explain: order.orderexplain,\n            order_name: order.productname,\n            code: order.efficacycode,\n            day: \"\",\n            frequency: 100,\n            pre_item_id: [index - 1],\n            next_item_id: PatientData[index + 1] ? [index + 1] : [-1],\n            r_x: link_length * (index + 1),\n            r_y: height2 * 0.5,\n        });\n        if (PatientData[index + 1]) {\n            graph2.links.push({\n                source: index,\n                target: index + 1,\n                value: 40,\n            });\n        }\n        if (width < link_length * (index + 1)) {\n            width = link_length * (index + 1) + margin;\n        }\n    });\n}\nconst allPathId = [];\nconst getAllPathId = (id, arr) => {\n    const targetOrder = data.order_all.find((order) => order.id == id);\n    if (!targetOrder) {\n        return allPathId.push(arr.concat());\n    }\n    arr.push(id);\n    targetOrder?.next_item_id.forEach((id) => {\n        getAllPathId(id, arr.concat());\n    });\n};\ngetAllPathId(0, []);\nconsole.log(allPathId.concat());\nconsole.log(JSON.parse(JSON.stringify(graph)));\nconsole.log(JSON.parse(JSON.stringify(place)));\nconsole.log(JSON.parse(JSON.stringify(graph2)));\nconsole.log(JSON.parse(JSON.stringify(place2)));\nconst patientPath = [];\nlet i = 0;\nlet j = 0;\nlet i_progress_count = 0;\nlet j_progress_count = 0;\nif (PatientData) {\n    while (data.order_all[i] && PatientData[j]) {\n        if (data.order_all[i].isGroup) {\n            const groupOrders = data.groups[data.order_all[i].order_type];\n        }\n        if (data.order_all[i].order_type === PatientData[j].ordertypevalue) {\n            patientPath.push(data.order_all[i].id);\n            i++;\n            j++;\n            i_progress_count = 0;\n            j_progress_count = 0;\n            continue;\n        }\n        else {\n            if (PatientData[j + 1]?.ordertypevalue === data.order_all[i]?.order_type) {\n                j++;\n                j_progress_count++;\n            }\n            else if (data.order_all[i + 1]?.order_type === data.order_all[j]?.order_type) {\n                i++;\n                i_progress_count++;\n            }\n            else {\n                j++;\n            }\n        }\n    }\n}\nconsole.log(patientPath.concat());\nfunction getAllPathName(path_id_array) {\n    return path_id_array.map((id) => {\n        const order = find_order_by_id(id);\n        if (order.isGroup || order.isInjection) {\n            const group_orders = data.groups[order.order_type];\n            return group_orders.map((group_order) => group_order.order_type);\n        }\n        else {\n            return order.order_type;\n        }\n    });\n}\nconst passedPath = allPathId.reduce((acc, cur) => {\n    if (!PatientData)\n        return [];\n    if (acc.length === 0) {\n        acc = cur;\n    }\n    if (getConcordance(acc, PatientData) < getConcordance(cur, PatientData)) {\n        acc = cur;\n    }\n    return acc;\n}, []);\nconsole.log(passedPath);\nfunction getConcordance(all_path_array, patient_orders) {\n    const path_names = getAllPathName(all_path_array).flat();\n    let count = 0;\n    path_names.forEach((name) => {\n        if (patient_orders.find((order) => order.ordertypevalue === name)) {\n            count++;\n        }\n    });\n    return count / path_names.length;\n}\nfunction getMatchPath(path_id_array, patient_orders) {\n    const path_name_array = getAllPathName(path_id_array);\n    let _i = 0;\n    let _j = 1;\n    const matchedPath = [0];\n    while (path_name_array[_j]) {\n        if (!patient_orders[_i])\n            break;\n        const path_name = path_name_array[_j];\n        if (Array.isArray(path_name)) {\n            const group_order = patient_orders.slice(_i, _i + path_name.length);\n            if (JSON.stringify(path_name.sort()) ==\n                JSON.stringify(group_order.map((order) => order.ordertypevalue).sort())) {\n                console.log(path_name);\n                matchedPath.push(path_id_array[_j]);\n                _i += path_name.length;\n                _j++;\n                continue;\n            }\n            else if (path_name.every((name) => patient_orders.find((order) => order.ordertypevalue === name)\n                ? true\n                : false)) {\n                _i++;\n            }\n            else {\n                // TODO\n                matchedPath.push(path_id_array[_j]);\n                _j++;\n                continue;\n            }\n        }\n        else {\n            if (path_name === patient_orders[_i].ordertypevalue) {\n                matchedPath.push(path_id_array[_j]);\n                _i++;\n                _j++;\n                console.log(path_name);\n                continue;\n            }\n            else if (\n            // 頻出パスが多い、患者のパスが飛んでいる\n            path_name_array.indexOf(patient_orders[_i].ordertypevalue) !== -1) {\n                const next_order_index = path_name_array.indexOf(patient_orders[_i + 1].ordertypevalue);\n                if (next_order_index !== -1 &&\n                    path_name_array.indexOf(patient_orders[_i].ordertypevalue) <\n                        next_order_index) {\n                    matchedPath.push(path_id_array[_j]);\n                    _j++;\n                    continue;\n                }\n                else {\n                    _i++;\n                }\n            }\n            else if (patient_orders.find((order) => order.ordertypevalue === path_name)) {\n                _i++;\n            }\n            else {\n                // matchedPath.push(path_id_array[_j]);\n                _i++;\n                _j++;\n            }\n        }\n    }\n    return matchedPath;\n}\nconst matchedPath = PatientData ? getMatchPath(passedPath, PatientData) : [];\nconsole.log(matchedPath);\n//Set up the color scale\nconst color = d3.scale.category20();\n//Append a SVG to the body of the html page. Assign this SVG as an object to svg\nd3.select(\"#clinicalpath\").append(\"h3\").text(\"頻出診療指示列\");\nconst svg = d3\n    .select(\"#clinicalpath\")\n    .append(\"svg\")\n    .attr(\"width\", width)\n    .attr(\"height\", height);\nPatientData &&\n    d3.select(\"#patientpath\").append(\"h3\").text(\"推薦対象患者診療指示列\");\nconst svg2 = PatientData &&\n    d3\n        .select(\"#patientpath\")\n        .append(\"svg\")\n        .attr(\"width\", width)\n        .attr(\"height\", height2);\n//sankeyチャートの表示\nconst units = \"人\";\nconst formatNumber = d3.format(\",.0f\"), // zero decimal places\nformat = function (d) {\n    return formatNumber(d) + \" \" + units;\n};\nconst path = function (pop_place) {\n    let curvature = 0.5;\n    function link(d, i) {\n        const targetPlace = pop_place(d.target);\n        const sourcePlace = pop_place(d.source);\n        const targetOrder = find_order_by_id(d.target);\n        const sourceOrder = find_order_by_id(d.source);\n        const x0 = sourcePlace.r_x, x1 = targetPlace.r_x, xi = d3.interpolateNumber(x0, x1), x2 = xi(curvature), x3 = xi(1 - curvature), y0 = targetOrder?.branch_frequency && d.branch_position === 0\n            ? sourcePlace.r_y - (circle_r * (100 - d.branch_frequency)) / 100\n            : targetOrder?.branch_frequency && d.branch_position === 1\n                ? sourcePlace.r_y + (circle_r * (100 - d.branch_frequency)) / 100\n                : sourcePlace.r_y, y1 = sourceOrder?.branch_frequency && d.branch_position === 0\n            ? targetPlace.r_y - (circle_r * (100 - d.branch_frequency)) / 100\n            : sourceOrder?.branch_frequency && d.branch_position === 1\n                ? targetPlace.r_y + (circle_r * (100 - d.branch_frequency)) / 100\n                : targetPlace.r_y;\n        return (\"M\" +\n            x0 +\n            \",\" +\n            y0 +\n            \"C\" +\n            x2 +\n            \",\" +\n            y0 +\n            \" \" +\n            x3 +\n            \",\" +\n            y1 +\n            \" \" +\n            x1 +\n            \",\" +\n            y1);\n    }\n    link.curvature = function (_) {\n        if (!arguments.length)\n            return curvature;\n        curvature = +_;\n        return link;\n    };\n    return link;\n};\n// パスを出力\nlet link1_data = svg.append(\"g\").selectAll(\".link1\").data(graph.links).enter();\nconst link1 = link1_data\n    .append(\"path\")\n    .attr(\"class\", \"link1\")\n    .attr(\"id\", function (d) {\n    return `link${d.source}-${d.target}`;\n})\n    .attr(\"d\", path(pop_place))\n    .attr(\"stroke\", \"#bbb\")\n    // .attr(\"stroke-opacity\", .7)\n    .style(\"stroke-width\", function (d) {\n    return Math.max(1, d.branch_frequency\n        ? (circle_r * 2 * d.branch_frequency) / 100\n        : circle_r * 2\n    // ((circle_r * 2 * data.Pnum[0].value) / Pnumsum) * 2 * 0.7\n    );\n})\n    .attr(\"fill\", \"none\");\nlink1_data\n    .append(\"text\")\n    .attr(\"class\", \"link1_text\")\n    .attr(\"font-size\", 14)\n    .attr(\"x\", function (d) {\n    return (pop_place(d.source).r_x + pop_place(d.target).r_x) / 2;\n})\n    .attr(\"y\", function (d) {\n    return (pop_place(d.source).r_y + pop_place(d.target).r_y) / 2;\n})\n    .style(\"text-anchor\", \"middle\")\n    .style(\"dominant-baseline\", \"central\")\n    .text(function (d) {\n    if (d.factor)\n        return d.factor;\n    return \"\";\n});\nlet link2_data = svg2 && svg2.append(\"g\").selectAll(\".link2\").data(graph2.links).enter();\n// throw Error();\nconst link2 = link2_data &&\n    link2_data\n        .append(\"path\")\n        .attr(\"class\", \"link2\")\n        .attr(\"id\", function (d) {\n        return `link2_${d.source}-${d.target}`;\n    })\n        .attr(\"d\", path(pop_place2))\n        .attr(\"stroke\", \"#bbb\")\n        // .attr(\"stroke-opacity\", .7)\n        .style(\"stroke-width\", function (d) {\n        return Math.max(1, circle_r * 2\n        // ((circle_r * 2 * data.Pnum[0].value) / Pnumsum) * 2 * 0.7\n        );\n    })\n        .attr(\"fill\", \"none\");\nif (link2_data) {\n    link2_data\n        .append(\"text\")\n        .attr(\"class\", \"link2_text\")\n        .attr(\"font-size\", 14)\n        .attr(\"x\", function (d) {\n        return (pop_place2(d.source).r_x + pop_place2(d.target).r_x) / 2;\n    })\n        .attr(\"y\", function (d) {\n        return (pop_place2(d.source).r_y + pop_place2(d.target).r_y) / 2;\n    })\n        .style(\"text-anchor\", \"middle\")\n        .style(\"dominant-baseline\", \"central\")\n        .text(function (d) {\n        if (d.factor)\n            return d.factor;\n        return \"\";\n    });\n}\n//Do the same with the circles for the nodes - no\nconst node = svg\n    .selectAll(\".node\")\n    .data(graph.orders)\n    .enter()\n    .append(\"g\")\n    .attr(\"class\", \"node\")\n    .attr(\"id\", function (d, i) {\n    return i;\n})\n    .on(\"click\", function () {\n    if (d3.select(this).select(\".info_text1\").style(\"visibility\") == \"visible\") {\n        d3.select(this).select(\".info_text1\").style(\"visibility\", \"hidden\");\n        d3.select(this).select(\".info_text2\").style(\"visibility\", \"hidden\");\n        d3.select(this).select(\".info_text3\").style(\"visibility\", \"hidden\");\n        d3.select(this).select(\".info_rect\").style(\"visibility\", \"hidden\");\n    }\n    else if (d3.select(this).select(\".info_text1\").style(\"visibility\") == \"hidden\") {\n        d3.select(this).select(\".info_text1\").style(\"visibility\", \"visible\");\n        d3.select(this).select(\".info_text2\").style(\"visibility\", \"visible\");\n        d3.select(this).select(\".info_text3\").style(\"visibility\", \"visible\");\n        d3.select(this).select(\".info_rect\").style(\"visibility\", \"visible\");\n    }\n});\nnode\n    .append(\"circle\")\n    .attr(\"r\", function (d) {\n    return (d.frequency / 100) ** 1.2 * circle_r;\n})\n    .style(\"fill\", function (d, i) {\n    return color(String(colorset(d.order_type)));\n})\n    .attr(\"cx\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"cy\", function (d, i) {\n    return d.r_y;\n})\n    .append(\"title\")\n    .text(function (d) {\n    return `出現率: ${d.frequency}%`;\n});\nnode\n    .append(\"text\")\n    .attr(\"class\", \"node_text\")\n    .attr(\"font-size\", 13)\n    .style(\"text-anchor\", \"middle\")\n    .text(function (d) {\n    return \"[\" + d.order_type + \"/ day : \" + d.day + \"]\";\n})\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 30;\n});\nnode\n    .append(\"rect\")\n    .style(\"visibility\", \"hidden\")\n    .style(\"fill\", function (d, i) {\n    return color(String(colorset(d.order_type)));\n})\n    .attr(\"class\", \"info_rect\")\n    .attr(\"fill-opacity\", \".7\")\n    .attr(\"width\", 200)\n    .attr(\"height\", 80)\n    .attr(\"stroke\", \"black\")\n    .attr(\"stroke-width\", \"0.5pt\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x - 105;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 120;\n});\nnode\n    .append(\"text\")\n    .style(\"visibility\", \"hidden\")\n    .attr(\"class\", \"info_text1\")\n    .attr(\"font-size\", 15)\n    .text(function (d) {\n    return d.order_explain;\n})\n    .style(\"text-anchor\", \"middle\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 100;\n});\nnode\n    .append(\"text\")\n    .style(\"visibility\", \"hidden\")\n    .attr(\"class\", \"info_text2\")\n    .attr(\"font-size\", 15)\n    .text(function (d) {\n    if (d.order_name == \"\")\n        return \"null\";\n    return d.order_name;\n})\n    .style(\"text-anchor\", \"middle\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 80;\n});\nnode\n    .append(\"text\")\n    .style(\"visibility\", \"hidden\")\n    .attr(\"class\", \"info_text3\")\n    .attr(\"font-size\", 15)\n    .text(function (d) {\n    if (d.code == \"\")\n        return \"null\";\n    return d.code;\n})\n    .style(\"text-anchor\", \"middle\")\n    .attr(\"x\", function (d, i) {\n    return d.r_x;\n})\n    .attr(\"y\", function (d, i) {\n    return d.r_y - 60;\n});\nconst node2 = svg2 &&\n    svg2\n        .selectAll(\".node2\")\n        .data(graph2.orders)\n        .enter()\n        .append(\"g\")\n        .attr(\"class\", \"node2\")\n        .attr(\"id\", function (d, i) {\n        return `node2-${i}`;\n    })\n        .on(\"click\", function () {\n        if (d3.select(this).select(\".info2_text1\").style(\"visibility\") == \"visible\") {\n            d3.select(this).select(\".info2_text1\").style(\"visibility\", \"hidden\");\n            d3.select(this).select(\".info2_text2\").style(\"visibility\", \"hidden\");\n            d3.select(this).select(\".info2_text3\").style(\"visibility\", \"hidden\");\n            d3.select(this).select(\".info2_rect\").style(\"visibility\", \"hidden\");\n        }\n        else if (d3.select(this).select(\".info2_text1\").style(\"visibility\") == \"hidden\") {\n            d3.select(this).select(\".info2_text1\").style(\"visibility\", \"visible\");\n            d3.select(this).select(\".info2_text2\").style(\"visibility\", \"visible\");\n            d3.select(this).select(\".info2_text3\").style(\"visibility\", \"visible\");\n            d3.select(this).select(\".info2_rect\").style(\"visibility\", \"visible\");\n        }\n    });\nif (node2) {\n    node2\n        .append(\"circle\")\n        .attr(\"r\", function (d) {\n        return circle_r;\n    })\n        .style(\"fill\", function (d, i) {\n        return color(String(colorset(d.order_type)));\n    })\n        .attr(\"cx\", function (d, i) {\n        return d.r_x;\n    })\n        .attr(\"cy\", function (d, i) {\n        return d.r_y;\n    })\n        .append(\"title\")\n        .text(function (d) {\n        return `出現率: ${d.frequency}%`;\n    });\n    node2\n        .append(\"text\")\n        .attr(\"class\", \"node2_text\")\n        .attr(\"font-size\", 13)\n        .style(\"text-anchor\", \"middle\")\n        .text(function (d) {\n        return \"[\" + d.order_type + \"/ day : \" + d.day + \"]\";\n    })\n        .attr(\"x\", function (d, i) {\n        return d.r_x;\n    })\n        .attr(\"y\", function (d, i) {\n        return d.r_y - 30;\n    });\n    node2\n        .append(\"rect\")\n        .style(\"visibility\", \"hidden\")\n        .style(\"fill\", function (d, i) {\n        return color(String(colorset(d.order_type)));\n    })\n        .attr(\"class\", \"info2_rect\")\n        .attr(\"fill-opacity\", \".7\")\n        .attr(\"width\", 200)\n        .attr(\"height\", 80)\n        .attr(\"stroke\", \"black\")\n        .attr(\"stroke-width\", \"0.5pt\")\n        .attr(\"x\", function (d, i) {\n        return d.r_x - 105;\n    })\n        .attr(\"y\", function (d, i) {\n        return d.r_y - 120;\n    });\n    node2\n        .append(\"text\")\n        .style(\"visibility\", \"hidden\")\n        .attr(\"class\", \"info2_text1\")\n        .attr(\"font-size\", 15)\n        .text(function (d) {\n        return d.order_explain;\n    })\n        .style(\"text-anchor\", \"middle\")\n        .attr(\"x\", function (d, i) {\n        return d.r_x;\n    })\n        .attr(\"y\", function (d, i) {\n        return d.r_y - 100;\n    });\n    node2\n        .append(\"text\")\n        .style(\"visibility\", \"hidden\")\n        .attr(\"class\", \"info2_text2\")\n        .attr(\"font-size\", 15)\n        .text(function (d) {\n        if (d.order_name == \"\")\n            return \"null\";\n        return d.order_name;\n    })\n        .style(\"text-anchor\", \"middle\")\n        .attr(\"x\", function (d, i) {\n        return d.r_x;\n    })\n        .attr(\"y\", function (d, i) {\n        return d.r_y - 80;\n    });\n    node2\n        .append(\"text\")\n        .style(\"visibility\", \"hidden\")\n        .attr(\"class\", \"info2_text3\")\n        .attr(\"font-size\", 15)\n        .text(function (d) {\n        if (d.code == \"\")\n            return \"null\";\n        return d.code;\n    })\n        .style(\"text-anchor\", \"middle\")\n        .attr(\"x\", function (d, i) {\n        return d.r_x;\n    })\n        .attr(\"y\", function (d, i) {\n        return d.r_y - 60;\n    });\n}\n//---Insert-------\nsvg\n    .append(\"defs\")\n    .selectAll(\"marker\")\n    .data([\"suit\", \"licensing\", \"resolved\"])\n    .enter()\n    .append(\"marker\")\n    .attr(\"id\", function (d) {\n    return d;\n})\n    .attr(\"viewBox\", \"0 -5 10 10\")\n    .attr(\"refX\", 10)\n    .attr(\"refY\", 0)\n    .attr(\"markerWidth\", 50)\n    .attr(\"markerHeight\", 10)\n    .attr(\"orient\", \"auto\")\n    .append(\"path\")\n    .attr(\"d\", \"M0,-5L10,0L0,5 L10,0 L0, -5\")\n    .style(\"stroke\", \"black\");\nfunction find_junction(orders) {\n    const new_orders = orders.map((order) => {\n        let target = order;\n        while (target.next_item_id.length == 1) {\n            if (target.pre_item_id.length == 1) {\n                target = find_order_by_id(target.pre_item_id[0]);\n            }\n            else {\n                //\n            }\n        }\n        return target;\n    });\n    const uniq = [...new Set(new_orders)];\n    if (uniq.length == 1) {\n        return uniq[0];\n    }\n    else {\n        return find_junction(uniq);\n    }\n}\nfunction push_place(parallel, j, pre_order_ids, group_num) {\n    let c_line = height * 0.5;\n    if (pre_order_ids.length == 1) {\n        const pre_order = place.find((order) => order.id == pre_order_ids[0]);\n        if (!pre_order || pre_order.id == 0)\n            return c_line;\n        c_line = pre_order.r_y;\n    }\n    else if (pre_order_ids.length > 1) {\n        let orders = pre_order_ids.map((pre_order_id) => find_order_by_id(pre_order_id));\n        const target_order = find_junction(orders);\n        c_line = place.find((order) => order.id == target_order.id).r_y;\n    }\n    // const c_line = height / 2;\n    if (parallel == 1) {\n        return c_line;\n    }\n    if (parallel % 2 == 0) {\n        if (j < parallel / 2)\n            return c_line + 75 + 150 * (j - parallel / 2) - (group_num ?? 0) * 15;\n        else\n            return c_line + 75 - 150 * (parallel / 2 - j) + (group_num ?? 0) * 15;\n    }\n    else {\n        parallel = parallel - 1;\n        if (j < parallel / 2)\n            return c_line + 150 + 150 * (j - parallel / 2);\n        else\n            return c_line + 150 - 150 * (parallel / 2 - j);\n    }\n    return 100;\n}\nfunction pop_place(id) {\n    return place.find((place) => place.id == id);\n}\nfunction pop_place2(id) {\n    return place2.find((place) => place.id == id);\n}\nfunction find_link(id) {\n    return graph.links[id];\n}\nfunction colorset(type) {\n    //nodeの色の決定\n    const number = dataTypes4Color.indexOf(type) !== -1\n        ? dataTypes4Color.indexOf(type)\n        : dataTypes4Color.push(type) - 1;\n    return number;\n}\nfunction colorset2(seqno) {\n    //seqの色の決定\n    if (seqno % 10 == 1) {\n        return 1;\n    }\n    else if (seqno % 10 == 2) {\n        return 2;\n    }\n    else if (seqno % 10 == 3) {\n        return 3;\n    }\n    else if (seqno % 10 == 4) {\n        return 4;\n    }\n    else if (seqno % 10 == 5) {\n        return 5;\n    }\n    else if (seqno % 10 == 6) {\n        return 6;\n    }\n    else if (seqno % 10 == 7) {\n        return 7;\n    }\n    else if (seqno % 10 == 8) {\n        return 8;\n    }\n    else if (seqno % 10 == 9) {\n        return 9;\n    }\n    else {\n        return 0;\n    }\n}\nd3.select(\"#clearButton\").on(\"click\", function () {\n    d3.selectAll(\".info_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".info_text1\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".info_text2\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".info_text3\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk1_text\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk1_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk2_text\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk2_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost1_text\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost1_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost2_text\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost2_rect\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".rect1\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".rect2\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".rect3\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".rect4\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".text1\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".text2\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".text3\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".text4\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk1_ptext\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".risk2_ptext\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost1_ptext\").style(\"visibility\", \"hidden\");\n    d3.selectAll(\".cost2_ptext\").style(\"visibility\", \"hidden\");\n});\n//---End Insert---\nconst branch_orders = data.order_all.filter((order) => {\n    return order.next_item_id.length > 1;\n});\nconst variants = [];\nconst selection = [];\nbranch_orders.forEach((branch_order) => {\n    variants.push(graph.links.filter((rec_link) => rec_link.source == branch_order.id));\n});\npassedPath.forEach((p, i) => {\n    // if (!path[i + 1]) return;\n    d3.select(`#link${p}-${passedPath[i + 1]}`).attr(\"stroke\", \"thistle\");\n});\nmatchedPath.forEach((p, i) => {\n    // if (!path[i + 1]) return;\n    d3.select(`#link${p}-${matchedPath[i + 1]}`).attr(\"stroke\", \"#bce2e8\");\n});\nconsole.log(variants);\nconst factors = [];\nd3.select(\"#changeFrequency\").on(\"click\", function (button) {\n    showFrequencyOfAll = !showFrequencyOfAll;\n    if (showFrequencyOfAll) {\n        d3.select(button).text(\"全患者中の出現率を表示\");\n    }\n    else {\n        d3.select(button).text(\"分岐に対応する患者中の出現率を表示\");\n    }\n    const nodes = d3.selectAll(\".node\");\n    const branchNodes = nodes.filter((node) => {\n        return !!find_order_by_id(node.id)?.frequency_of_all;\n    });\n    if (showFrequencyOfAll) {\n        branchNodes.select(\"circle\").attr(\"r\", (d) => {\n            return (d.frequency_of_all / 100) ** 1.2 * circle_r;\n        });\n    }\n    else {\n        branchNodes.select(\"circle\").attr(\"r\", (d) => {\n            return (d.frequency / 100) ** 1.2 * circle_r;\n        });\n    }\n});\n// variants.forEach((variant, index) => {\n//   console.log(variant);\n//   d3.select(\"#buttons\")\n//     .selectAll(`button${index}`)\n//     .data(variant)\n//     .enter()\n//     .append(\"button\")\n//     .text(function (d) {\n//       return d.factor ?? \"\";\n//     })\n//     .on(\"click\", function (d) {\n//       selection.push(d.factor);\n//       const unselected_factors = variants\n//         .find((variant) => variant.includes(d))\n//         ?.filter((path) => path !== d);\n//       unselected_factors?.forEach((path) => {\n//         const index = factors.indexOf(path);\n//         if (index == -1) return;\n//         factors.splice(index, 1);\n//       });\n//       factors.push(d);\n//       d3.selectAll(\".link1\").attr(\"stroke\", \"#ccc\");\n//       let paths = allPathId.concat();\n//       factors.forEach((link) => {\n//         paths = paths.filter((path) => path.includes(link.target));\n//       });\n//       console.log(paths);\n//       // const path = test2.find((ids) => ids.find((id) => id == d.target));\n//       paths?.forEach((path) =>\n//         path.forEach((p, i) => {\n//           if (!path[i + 1]) return;\n//           d3.select(`#link${p}-${path[i + 1]}`).attr(\"stroke\", \"thistle\");\n//         })\n//       );\n//     });\n//   d3.select(\"#buttons\").append(\"br\");\n// });\n// });\nconst onClick = () => {\n    if (document) {\n        const form = (document.getElementById(\"input_message\"));\n        const value = form.value;\n    }\n};\n\n\n//# sourceURL=webpack://Visualization_webpack/./src/index.ts?");
 
 /***/ }),
 
-/***/ "./src/json/data.json":
-/*!****************************!*\
-  !*** ./src/json/data.json ***!
-  \****************************/
+/***/ "./src/json/hepatectomy/data.json":
+/*!****************************************!*\
+  !*** ./src/json/hepatectomy/data.json ***!
+  \****************************************/
+/*! default exports */
+/*! export groups [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export group1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export 2 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! export order_all [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export isGroup [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 2 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 3 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 4 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 5 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 6 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 7 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 8 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: module */
+/***/ ((module) => {
+
+"use strict";
+eval("module.exports = JSON.parse(\"{\\\"order_all\\\":[{\\\"id\\\":0,\\\"order_type\\\":\\\"start\\\",\\\"order_explain\\\":\\\"start\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-4\\\",\\\"frequency\\\":100,\\\"pre_item_id\\\":[-1],\\\"next_item_id\\\":[1]},{\\\"id\\\":1,\\\"order_type\\\":\\\"group1\\\",\\\"order_explain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-3\\\",\\\"frequency\\\":56,\\\"pre_item_id\\\":[0],\\\"next_item_id\\\":[2],\\\"isGroup\\\":true},{\\\"id\\\":2,\\\"order_type\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_explain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\",\\\"time_interval\\\":[2550],\\\"pre_item_id\\\":[1],\\\"next_item_id\\\":[3],\\\"frequency\\\":83},{\\\"id\\\":3,\\\"order_type\\\":\\\"手術麻酔\\\",\\\"order_explain\\\":\\\"閉鎖循環式全身麻酔（重症以外）\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-3\\\",\\\"time_interval\\\":[1143],\\\"pre_item_id\\\":[2],\\\"next_item_id\\\":[4],\\\"frequency\\\":97},{\\\"id\\\":4,\\\"order_type\\\":\\\"手術\\\",\\\"order_explain\\\":\\\"肝切除術\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\",\\\"time_interval\\\":[33],\\\"frequency\\\":97,\\\"pre_item_id\\\":[3],\\\"next_item_id\\\":[5]},{\\\"id\\\":5,\\\"order_type\\\":\\\"放射線単純\\\",\\\"order_explain\\\":\\\"単純－胸腹部\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"time_interval\\\":[2043],\\\"frequency\\\":100,\\\"pre_item_id\\\":[4],\\\"next_item_id\\\":[6]},{\\\"id\\\":6,\\\"order_type\\\":\\\"放射線単純\\\",\\\"order_explain\\\":\\\"単純－胸腹部\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"2\\\",\\\"time_interval\\\":[1450],\\\"frequency\\\":74,\\\"pre_item_id\\\":[5],\\\"next_item_id\\\":[7]},{\\\"id\\\":7,\\\"order_type\\\":\\\"放射線単純\\\",\\\"order_explain\\\":\\\"単純－胸腹部\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"3\\\",\\\"time_interval\\\":[1446],\\\"pre_item_id\\\":[6],\\\"next_item_id\\\":[8],\\\"frequency\\\":77},{\\\"id\\\":8,\\\"order_type\\\":\\\"end\\\",\\\"order_explain\\\":\\\"end\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"3\\\",\\\"frequency\\\":93,\\\"pre_item_id\\\":[7],\\\"next_item_id\\\":[-1]}],\\\"groups\\\":{\\\"group1\\\":[{\\\"order_type\\\":\\\"放射線単純\\\",\\\"order_explain\\\":\\\"単純－胸腹部\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-3\\\"},{\\\"order_type\\\":\\\"負荷試験\\\",\\\"order_explain\\\":\\\"ＩＣＧ前\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-3\\\"},{\\\"order_type\\\":\\\"検体検査\\\",\\\"order_explain\\\":\\\"総蛋白\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-3\\\"}]}}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/hepatectomy/data.json?");
+
+/***/ }),
+
+/***/ "./src/json/hepatectomy/patient1.json":
+/*!********************************************!*\
+  !*** ./src/json/hepatectomy/patient1.json ***!
+  \********************************************/
+/*! default exports */
+/*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 10 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 11 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 12 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 13 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 14 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 15 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 16 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 17 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 18 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 19 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 2 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 20 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 21 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 22 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 23 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 24 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 25 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 26 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 3 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 4 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 5 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 6 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 7 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 8 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 9 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: module */
+/***/ ((module) => {
+
+"use strict";
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015082606563118\\\",\\\"ordertypevalue\\\":\\\"ＭＲＩ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-02 15:19:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015072306265964\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-03 10:41:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106620225\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2015-09-03 10:20:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106620218\\\",\\\"ordertypevalue\\\":\\\"自科検体検査\\\",\\\"orderexplain\\\":\\\"ＩＣＧ１５分\\\",\\\"enforcedinfodate\\\":\\\"2015-09-03 10:29:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090206636639\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"尿Ｎａ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-03 15:39:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015082406538744\\\",\\\"ordertypevalue\\\":\\\"生理検査\\\",\\\"orderexplain\\\":\\\"心エコー－経胸壁\\\",\\\"enforcedinfodate\\\":\\\"2015-09-04 11:01:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090306648832\\\",\\\"ordertypevalue\\\":\\\"自己血・細胞採取予約\\\",\\\"orderexplain\\\":\\\"\\\",\\\"enforcedinfodate\\\":\\\"2015-09-04 13:30:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090706673764\\\",\\\"ordertypevalue\\\":\\\"内視鏡\\\",\\\"orderexplain\\\":\\\"内視鏡\\\",\\\"enforcedinfodate\\\":\\\"2015-09-08 08:30:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090306648932\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2015-09-08 08:40:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090706673724\\\",\\\"ordertypevalue\\\":\\\"内視鏡\\\",\\\"orderexplain\\\":\\\"内視鏡\\\",\\\"enforcedinfodate\\\":\\\"2015-09-08 10:30:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090306648833\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"尿素窒素\\\",\\\"enforcedinfodate\\\":\\\"2015-09-08 10:46:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090906695991\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉鎖循環式全身麻酔（重症以外）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-09 08:35:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015082406538727\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"肝切除術\\\",\\\"enforcedinfodate\\\":\\\"2015-09-09 09:00:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090906696113\\\",\\\"ordertypevalue\\\":\\\"血液製剤依頼\\\",\\\"orderexplain\\\":\\\"自己全血４００\\\",\\\"enforcedinfodate\\\":\\\"2015-09-09 13:25:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619763\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-09 14:13:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619754\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＦＩＢ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-09 22:31:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619768\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"プロカルシトニン（ＰＣＴ）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-10 06:26:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619765\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＴＢＩＬ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-10 06:34:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619769\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-10 08:13:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619775\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"［ＰＴ］\\\",\\\"enforcedinfodate\\\":\\\"2015-09-11 06:31:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619773\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＴＢＩＬ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-11 06:38:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619780\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-11 14:50:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619782\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＴＢＩＬ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-12 06:08:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619785\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"プロカルシトニン（ＰＣＴ）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-12 06:19:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619793\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"プロカルシトニン（ＰＣＴ）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-14 06:19:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015090106619799\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2015-09-16 08:42:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"191050BAAE4AC6280BD837566C131915\\\",\\\"orderno\\\":\\\"O2015091606768682\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-17 06:10:00\\\",\\\"inhospdate\\\":\\\"2015-09-02\\\",\\\"leavethospdate\\\":\\\"2015-09-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/hepatectomy/patient1.json?");
+
+/***/ }),
+
+/***/ "./src/json/hepatectomy/patient2.json":
+/*!********************************************!*\
+  !*** ./src/json/hepatectomy/patient2.json ***!
+  \********************************************/
+/*! default exports */
+/*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 10 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 11 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 12 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 13 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 14 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 15 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 16 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 17 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 18 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 19 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 2 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 20 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 21 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 22 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 23 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 3 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 4 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 5 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 6 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 7 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 8 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 9 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: module */
+/***/ ((module) => {
+
+"use strict";
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090306650047\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-09 14:40:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090306650038\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2015-09-10 08:34:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669414\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"尿Ｎａ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-10 13:24:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669403\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-11 10:09:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015082406537887\\\",\\\"ordertypevalue\\\":\\\"負荷試験\\\",\\\"orderexplain\\\":\\\"ＩＣＧ前\\\",\\\"enforcedinfodate\\\":\\\"2015-09-11 13:34:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090906699570\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"ＴＰ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-15 08:30:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090906699568\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2015-09-15 08:46:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015091606762149\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉鎖循環式全身麻酔（重症以外）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-16 08:30:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015081006428002\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"肝切除術\\\",\\\"enforcedinfodate\\\":\\\"2015-09-16 09:00:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669426\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＦＩＢ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-16 22:31:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669434\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-16 17:03:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015091606763414\\\",\\\"ordertypevalue\\\":\\\"血液製剤依頼\\\",\\\"orderexplain\\\":\\\"自己ＦＦＰ３００\\\",\\\"enforcedinfodate\\\":\\\"2015-09-16 15:32:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669439\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"プロカルシトニン（ＰＣＴ）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-17 06:26:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669436\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＴＢＩＬ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-17 06:55:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669440\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-17 08:05:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669445\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"［ＰＴ］\\\",\\\"enforcedinfodate\\\":\\\"2015-09-18 06:31:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669444\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＴＢＩＬ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-18 06:52:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669449\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-18 08:31:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015091806785362\\\",\\\"ordertypevalue\\\":\\\"病理診断\\\",\\\"orderexplain\\\":\\\"Ｔ－Ｍ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-18 11:13:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669450\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＴＢＩＬ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-19 05:42:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669451\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"プロカルシトニン（ＰＣＴ）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-19 06:19:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015090606669458\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"プロカルシトニン（ＰＣＴ）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-21 06:19:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015092206863995\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"プロカルシトニン（ＰＣＴ）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-23 05:37:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"8F93C313B8765AA0A28C138A9DEEDAE7\\\",\\\"orderno\\\":\\\"O2015092506888097\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"リパーゼ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-26 06:10:00\\\",\\\"inhospdate\\\":\\\"2015-09-09\\\",\\\"leavethospdate\\\":\\\"2015-09-28\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/hepatectomy/patient2.json?");
+
+/***/ }),
+
+/***/ "./src/json/hepatectomy/patient3.json":
+/*!********************************************!*\
+  !*** ./src/json/hepatectomy/patient3.json ***!
+  \********************************************/
+/*! default exports */
+/*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 10 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 11 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 12 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 13 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 14 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 15 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 16 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 17 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 18 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 19 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 2 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 20 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 21 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 22 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 23 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 24 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 25 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 3 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 4 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 5 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 6 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 7 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 8 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 9 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: module */
+/***/ ((module) => {
+
+"use strict";
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091306729050\\\",\\\"ordertypevalue\\\":\\\"生理検査\\\",\\\"orderexplain\\\":\\\"心電図－心電図検査\\\",\\\"enforcedinfodate\\\":\\\"2015-09-16 14:14:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091306729048\\\",\\\"ordertypevalue\\\":\\\"生理検査\\\",\\\"orderexplain\\\":\\\"肺機能検査１－フローボリューム\\\",\\\"enforcedinfodate\\\":\\\"2015-09-16 14:19:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091306729047\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-16 14:41:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091106721401\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-17 09:07:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091306729051\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2015-09-17 10:27:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091306729044\\\",\\\"ordertypevalue\\\":\\\"負荷試験\\\",\\\"orderexplain\\\":\\\"ＩＣＧ前\\\",\\\"enforcedinfodate\\\":\\\"2015-09-17 11:29:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091106722401\\\",\\\"ordertypevalue\\\":\\\"ＰＥＴＣＴ\\\",\\\"orderexplain\\\":\\\"ＰＥＴＣＴ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-17 13:02:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091306729045\\\",\\\"ordertypevalue\\\":\\\"自科検体検査\\\",\\\"orderexplain\\\":\\\"ＩＣＧ１５分\\\",\\\"enforcedinfodate\\\":\\\"2015-09-17 15:16:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091106722410\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-18 11:03:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091106721374\\\",\\\"ordertypevalue\\\":\\\"生理検査\\\",\\\"orderexplain\\\":\\\"心エコー－経胸壁\\\",\\\"enforcedinfodate\\\":\\\"2015-09-18 17:21:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091106721372\\\",\\\"ordertypevalue\\\":\\\"ＭＲＩ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-24 09:52:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092106811877\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"ＴＰ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-25 08:30:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091806787978\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2015-09-25 08:41:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092606904378\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉鎖循環式全身麻酔（重症以外）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-28 08:13:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091106722390\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"肝切除術\\\",\\\"enforcedinfodate\\\":\\\"2015-09-28 09:00:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091806787996\\\",\\\"ordertypevalue\\\":\\\"血液製剤依頼\\\",\\\"orderexplain\\\":\\\"赤血球液\\\",\\\"enforcedinfodate\\\":\\\"2015-09-28 10:28:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015091806787912\\\",\\\"ordertypevalue\\\":\\\"血液製剤依頼\\\",\\\"orderexplain\\\":\\\"照射血小板\\\",\\\"enforcedinfodate\\\":\\\"2015-09-28 15:52:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092406870770\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＦＩＢ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-28 22:31:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092406870787\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-28 17:38:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092406870793\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＴＢＩＬ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-29 06:23:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092406870801\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"プロカルシトニン（ＰＣＴ）\\\",\\\"enforcedinfodate\\\":\\\"2015-09-29 06:26:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092906960790\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"Ｎａ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-29 07:43:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092406870803\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-29 07:55:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092406870809\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＴＢＩＬ\\\",\\\"enforcedinfodate\\\":\\\"2015-09-30 05:45:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092406870811\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"［ＰＴ］\\\",\\\"enforcedinfodate\\\":\\\"2015-09-30 06:31:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"97F4EB41FE45CF5A6E0433A923387900\\\",\\\"orderno\\\":\\\"O2015092406870818\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2015-09-30 11:52:00\\\",\\\"inhospdate\\\":\\\"2015-09-16\\\",\\\"leavethospdate\\\":\\\"2015-10-13\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"orderstatus\\\":\\\"入院\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/hepatectomy/patient3.json?");
+
+/***/ }),
+
+/***/ "./src/json/rfa/data.json":
+/*!********************************!*\
+  !*** ./src/json/rfa/data.json ***!
+  \********************************/
+/*! default exports */
+/*! export groups [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export group1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! export order_all [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 2 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 3 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 4 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 5 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 6 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export isGroup [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 7 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export time_interval [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 8 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export code [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export day [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export frequency_of_all [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export next_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     export order_explain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_name [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export order_type [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export pre_item_id [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!       other exports [not provided] [no usage info] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: module */
+/***/ ((module) => {
+
+"use strict";
+eval("module.exports = JSON.parse(\"{\\\"order_all\\\":[{\\\"id\\\":0,\\\"order_type\\\":\\\"start\\\",\\\"order_explain\\\":\\\"start\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-5\\\",\\\"frequency\\\":100,\\\"pre_item_id\\\":[-1],\\\"next_item_id\\\":[1]},{\\\"id\\\":1,\\\"order_type\\\":\\\"負荷試験\\\",\\\"order_explain\\\":\\\"ＩＣＧ前\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-5\\\",\\\"frequency\\\":56,\\\"pre_item_id\\\":[0],\\\"next_item_id\\\":[2]},{\\\"id\\\":2,\\\"order_type\\\":\\\"ＣＴ\\\",\\\"order_explain\\\":\\\"腹部\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"\\\",\\\"time_interval\\\":[1194],\\\"pre_item_id\\\":[1],\\\"next_item_id\\\":[3],\\\"frequency\\\":83},{\\\"id\\\":3,\\\"order_type\\\":\\\"自科生理検査\\\",\\\"order_explain\\\":\\\"超音波検査（断層撮影法）（胸腹部）\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-3\\\",\\\"time_interval\\\":[281],\\\"pre_item_id\\\":[2],\\\"next_item_id\\\":[4],\\\"frequency\\\":97},{\\\"id\\\":4,\\\"order_type\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_explain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"order_name\\\":\\\"グリセリン浣腸「オヲタ」\\\",\\\"code\\\":\\\"235\\\",\\\"day\\\":\\\"0\\\",\\\"time_interval\\\":[3863],\\\"frequency\\\":97,\\\"pre_item_id\\\":[3],\\\"next_item_id\\\":[5]},{\\\"id\\\":5,\\\"order_type\\\":\\\"処置\\\",\\\"order_explain\\\":\\\"RFA\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\",\\\"time_interval\\\":[603],\\\"frequency\\\":100,\\\"pre_item_id\\\":[4],\\\"next_item_id\\\":[6]},{\\\"id\\\":6,\\\"order_type\\\":\\\"group1\\\",\\\"order_explain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"time_interval\\\":[662],\\\"frequency\\\":74,\\\"pre_item_id\\\":[5],\\\"next_item_id\\\":[7],\\\"isGroup\\\":true},{\\\"id\\\":7,\\\"order_type\\\":\\\"ＣＴ\\\",\\\"order_explain\\\":\\\"腹部\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"time_interval\\\":[391],\\\"pre_item_id\\\":[6],\\\"next_item_id\\\":[8],\\\"frequency\\\":77},{\\\"id\\\":8,\\\"order_type\\\":\\\"end\\\",\\\"order_explain\\\":\\\"end\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":93,\\\"frequency_of_all\\\":65,\\\"pre_item_id\\\":[7],\\\"next_item_id\\\":[-1]}],\\\"groups\\\":{\\\"group1\\\":[{\\\"order_type\\\":\\\"自科生理検査\\\",\\\"order_explain\\\":\\\"超音波検査（断層撮影法）（胸腹部）\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"検体検査\\\",\\\"order_explain\\\":\\\"総ビリルビン\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\"}]}}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/rfa/data.json?");
+
+/***/ }),
+
+/***/ "./src/json/rfa/patient1.json":
+/*!************************************!*\
+  !*** ./src/json/rfa/patient1.json ***!
+  \************************************/
+/*! default exports */
+/*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 10 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 11 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 12 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 13 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 14 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 15 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 16 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 17 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 18 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 19 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 2 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 20 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 21 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 22 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 3 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 4 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 5 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 6 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 7 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 8 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 9 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: module */
+/***/ ((module) => {
+
+"use strict";
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009011575543538\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"尿Ｎａ\\\",\\\"enforcedinfodate\\\":\\\"2009-01-19 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0840\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009011575545003\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2009-01-19 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1146\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009011575545008\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"胸部\\\",\\\"enforcedinfodate\\\":\\\"2009-01-19 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1147\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009011575543541\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"尿Ｎａ\\\",\\\"enforcedinfodate\\\":\\\"2009-01-20 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0835\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009012075584388\\\",\\\"ordertypevalue\\\":\\\"自科生理検査\\\",\\\"orderexplain\\\":\\\"超音波検査（断層撮影法）（胸腹部）\\\",\\\"enforcedinfodate\\\":\\\"2009-01-22 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0830\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009012275598161\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2009-01-23 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1040\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009012275602281\\\",\\\"ordertypevalue\\\":\\\"負荷試験\\\",\\\"orderexplain\\\":\\\"ＩＣＧ前\\\",\\\"enforcedinfodate\\\":\\\"2009-01-23 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1051\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009012275601077\\\",\\\"ordertypevalue\\\":\\\"血液型関連検査\\\",\\\"orderexplain\\\":\\\"ＡＢＯ式血液型\\\",\\\"enforcedinfodate\\\":\\\"2009-01-23 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1111\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009012375605359\\\",\\\"ordertypevalue\\\":\\\"内視鏡\\\",\\\"orderexplain\\\":\\\"鎮静剤投与\\\",\\\"enforcedinfodate\\\":\\\"2009-01-23 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1156\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009012275602472\\\",\\\"ordertypevalue\\\":\\\"内視鏡\\\",\\\"orderexplain\\\":\\\"鎮静剤．同意書発行あり\\\",\\\"enforcedinfodate\\\":\\\"2009-01-26 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0830\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009012175588987\\\",\\\"ordertypevalue\\\":\\\"ＩＶＲ・血管造影\\\",\\\"orderexplain\\\":\\\"腹部／胸部／四肢　ＡＧ・ＩＶＲ\\\",\\\"enforcedinfodate\\\":\\\"2009-01-29 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1213\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009012875639721\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2009-01-29 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1213\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009012975651233\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2009-01-30 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0834\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009013075662968\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2009-02-02 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0847\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009013075663000\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2009-02-02 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0946\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009013075662973\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2009-02-02 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1942\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009013075662974\\\",\\\"ordertypevalue\\\":\\\"処置\\\",\\\"orderexplain\\\":\\\"RFA\\\",\\\"enforcedinfodate\\\":\\\"2009-02-02 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"2110\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009013075662978\\\",\\\"ordertypevalue\\\":\\\"自科生理検査\\\",\\\"orderexplain\\\":\\\"超音波検査（断層撮影法）（胸腹部）\\\",\\\"enforcedinfodate\\\":\\\"2009-02-03 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0846\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009013075662979\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総ビリルビン\\\",\\\"enforcedinfodate\\\":\\\"2009-02-03 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0853\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009020375688910\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2009-02-05 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0836\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009020275678911\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2009-02-05 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0903\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009020575706429\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2009-02-09 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0951\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"005151FD9E56C9FDD18FCB17E9428193\\\",\\\"orderno\\\":\\\"O2009011575545016\\\",\\\"ordertypevalue\\\":\\\"ＰＥＴＣＴ\\\",\\\"orderexplain\\\":\\\"ＰＥＴＣＴ\\\",\\\"enforcedinfodate\\\":\\\"2009-02-10 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-01-15\\\",\\\"leavethospdate\\\":\\\"2009-02-12\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1616\\\",\\\"orderstatus\\\":\\\"入院\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/rfa/patient1.json?");
+
+/***/ }),
+
+/***/ "./src/json/rfa/patient2.json":
+/*!************************************!*\
+  !*** ./src/json/rfa/patient2.json ***!
+  \************************************/
+/*! default exports */
+/*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 10 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 11 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 12 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 2 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 3 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 4 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 5 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 6 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 7 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 8 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 9 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: module */
+/***/ ((module) => {
+
+"use strict";
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009052976434750\\\",\\\"ordertypevalue\\\":\\\"負荷試験\\\",\\\"orderexplain\\\":\\\"ＩＣＧ前\\\",\\\"enforcedinfodate\\\":\\\"2009-06-02 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1050\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060376465195\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2009-06-04 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1036\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009052976434774\\\",\\\"ordertypevalue\\\":\\\"ＩＶＲ・血管造影\\\",\\\"orderexplain\\\":\\\"腹部／胸部／四肢　ＡＧ・ＩＶＲ\\\",\\\"enforcedinfodate\\\":\\\"2009-06-04 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1112\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060576478563\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2009-06-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0748\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060576478573\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2009-06-08 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0842\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060576484422\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2009-06-08 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0853\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060576478596\\\",\\\"ordertypevalue\\\":\\\"処置\\\",\\\"orderexplain\\\":\\\"RFA\\\",\\\"enforcedinfodate\\\":\\\"2009-06-08 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1451\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060576478595\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2009-06-08 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1900\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060576478600\\\",\\\"ordertypevalue\\\":\\\"自科生理検査\\\",\\\"orderexplain\\\":\\\"超音波検査（断層撮影法）（胸腹部）\\\",\\\"enforcedinfodate\\\":\\\"2009-06-09 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0832\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060576478601\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総ビリルビン\\\",\\\"enforcedinfodate\\\":\\\"2009-06-09 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0916\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060976499708\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2009-06-10 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1459\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009060976504430\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"尿素窒素\\\",\\\"enforcedinfodate\\\":\\\"2009-06-11 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0834\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"0BC1D18B7556E6406163960DAC231955\\\",\\\"orderno\\\":\\\"O2009061276529752\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2009-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2009-05-25\\\",\\\"leavethospdate\\\":\\\"2009-06-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0844\\\",\\\"orderstatus\\\":\\\"入院\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/rfa/patient2.json?");
+
+/***/ }),
+
+/***/ "./src/json/rfa/patient3.json":
+/*!************************************!*\
+  !*** ./src/json/rfa/patient3.json ***!
+  \************************************/
+/*! default exports */
+/*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
+/*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 1 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 10 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 11 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 12 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 13 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 14 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 15 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 16 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 17 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 2 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 3 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 4 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 5 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 6 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 7 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 8 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   export 9 [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacy [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export efficacycode [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfodate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export enforcedinfotime [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export inhospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export leavethospdate [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export nowprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderexplain [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderno [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export orderstatus [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export ordertypevalue [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export patientid [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export postprice [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     export productname [provided] [no usage info] [missing usage info prevents renaming] */
+/*!     other exports [not provided] [no usage info] */
+/*!   other exports [not provided] [no usage info] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: module */
+/***/ ((module) => {
+
+"use strict";
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081274589081\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2008-08-13 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0830\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081274595805\\\",\\\"ordertypevalue\\\":\\\"放射線単純\\\",\\\"orderexplain\\\":\\\"単純－胸腹部\\\",\\\"enforcedinfodate\\\":\\\"2008-08-13 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0958\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081274595800\\\",\\\"ordertypevalue\\\":\\\"生理検査\\\",\\\"orderexplain\\\":\\\"心電図－心電図検査\\\",\\\"enforcedinfodate\\\":\\\"2008-08-13 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1100\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081274589082\\\",\\\"ordertypevalue\\\":\\\"自科生理検査\\\",\\\"orderexplain\\\":\\\"超音波検査（断層撮影法）（胸腹部）\\\",\\\"enforcedinfodate\\\":\\\"2008-08-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0830\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081274589089\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"尿Ｎａ\\\",\\\"enforcedinfodate\\\":\\\"2008-08-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0839\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081274589090\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"尿Ｎａ\\\",\\\"enforcedinfodate\\\":\\\"2008-08-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0834\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081274589087\\\",\\\"ordertypevalue\\\":\\\"負荷試験\\\",\\\"orderexplain\\\":\\\"ＩＣＧ前\\\",\\\"enforcedinfodate\\\":\\\"2008-08-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1153\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081274589085\\\",\\\"ordertypevalue\\\":\\\"自科生理検査\\\",\\\"orderexplain\\\":\\\"超音波検査（断層撮影法）（胸腹部）\\\",\\\"enforcedinfodate\\\":\\\"2008-08-18 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1130\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081574611704\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2008-08-19 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1358\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081974632853\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2008-08-20 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0834\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081974632830\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2008-08-20 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0845\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081974632836\\\",\\\"ordertypevalue\\\":\\\"処置\\\",\\\"orderexplain\\\":\\\"RFA\\\",\\\"enforcedinfodate\\\":\\\"2008-08-21 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"2024\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081974632835\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2008-08-21 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"2030\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081974632842\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総ビリルビン\\\",\\\"enforcedinfodate\\\":\\\"2008-08-22 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0844\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008081974632841\\\",\\\"ordertypevalue\\\":\\\"自科生理検査\\\",\\\"orderexplain\\\":\\\"超音波検査（断層撮影法）（胸腹部）\\\",\\\"enforcedinfodate\\\":\\\"2008-08-22 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0919\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008082174651156\\\",\\\"ordertypevalue\\\":\\\"自科生理検査\\\",\\\"orderexplain\\\":\\\"超音波検査（断層撮影法）（胸腹部）\\\",\\\"enforcedinfodate\\\":\\\"2008-08-25 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1130\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008082574670888\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2008-08-26 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"0830\\\",\\\"orderstatus\\\":\\\"入院\\\"},{\\\"patientid\\\":\\\"11D1E8E83DB03375DC89B30EC111F058\\\",\\\"orderno\\\":\\\"O2008082174651161\\\",\\\"ordertypevalue\\\":\\\"ＣＴ\\\",\\\"orderexplain\\\":\\\"腹部\\\",\\\"enforcedinfodate\\\":\\\"2008-08-26 00:00:00\\\",\\\"inhospdate\\\":\\\"2008-08-12\\\",\\\"leavethospdate\\\":\\\"2008-08-29\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1201\\\",\\\"orderstatus\\\":\\\"入院\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/rfa/patient3.json?");
+
+/***/ }),
+
+/***/ "./src/json/tur-bt/data.json":
+/*!***********************************!*\
+  !*** ./src/json/tur-bt/data.json ***!
+  \***********************************/
 /*! default exports */
 /*! export groups [provided] [no usage info] [missing usage info prevents renaming] */
 /*!   export group1 [provided] [no usage info] [missing usage info prevents renaming] */
@@ -599,14 +3098,14 @@ eval("\nvar __createBinding = (this && this.__createBinding) || (Object.create ?
 /***/ ((module) => {
 
 "use strict";
-eval("module.exports = JSON.parse(\"{\\\"order_all\\\":[{\\\"id\\\":0,\\\"order_type\\\":\\\"start\\\",\\\"order_explain\\\":\\\"start\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\",\\\"frequency\\\":100,\\\"pre_item_id\\\":[-1],\\\"next_item_id\\\":[1]},{\\\"id\\\":1,\\\"order_type\\\":\\\"服薬指導\\\",\\\"order_explain\\\":\\\"薬剤管理指導料３\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\",\\\"frequency\\\":64,\\\"pre_item_id\\\":[0],\\\"next_item_id\\\":[2,3],\\\"factor\\\":[\\\"入院歴なし\\\",\\\"入院歴あり\\\"]},{\\\"id\\\":2,\\\"order_type\\\":\\\"group1\\\",\\\"order_explain\\\":\\\"血液型関連検査, 検体検査, クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"\\\",\\\"time_interval\\\":[147],\\\"pre_item_id\\\":[1],\\\"next_item_id\\\":[4],\\\"frequency\\\":86,\\\"frequency_of_all\\\":51,\\\"branch_frequency\\\":42,\\\"isGroup\\\":true},{\\\"id\\\":3,\\\"order_type\\\":\\\"group2\\\",\\\"order_explain\\\":\\\"検体検査, クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"\\\",\\\"time_interval\\\":[190],\\\"pre_item_id\\\":[1],\\\"next_item_id\\\":[4],\\\"frequency\\\":83,\\\"frequency_of_all\\\":83,\\\"branch_frequency\\\":57,\\\"isGroup\\\":true},{\\\"id\\\":4,\\\"order_type\\\":\\\"処方\\\",\\\"order_explain\\\":\\\"外用薬剤\\\",\\\"order_name\\\":\\\"グリセリン浣腸「オヲタ」\\\",\\\"code\\\":\\\"235\\\",\\\"day\\\":\\\"0\\\",\\\"time_interval\\\":[703,654],\\\"frequency\\\":90,\\\"pre_item_id\\\":[2,3],\\\"next_item_id\\\":[5]},{\\\"id\\\":5,\\\"order_type\\\":\\\"手術麻酔\\\",\\\"order_explain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\",\\\"time_interval\\\":[738],\\\"frequency\\\":71,\\\"pre_item_id\\\":[4],\\\"next_item_id\\\":[6]},{\\\"id\\\":6,\\\"order_type\\\":\\\"手術\\\",\\\"order_explain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\",\\\"time_interval\\\":[33],\\\"frequency\\\":100,\\\"pre_item_id\\\":[5],\\\"next_item_id\\\":[7]},{\\\"id\\\":7,\\\"order_type\\\":\\\"group3\\\",\\\"order_explain\\\":\\\"start\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"time_interval\\\":[93],\\\"pre_item_id\\\":[6],\\\"next_item_id\\\":[8,9],\\\"frequency\\\":81,\\\"factor\\\":[\\\"手術が13:00以前\\\",\\\"手術が13:00以降\\\"],\\\"isGroup\\\":true},{\\\"id\\\":8,\\\"order_type\\\":\\\"注射群1\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":93,\\\"frequency_of_all\\\":65,\\\"pre_item_id\\\":[7],\\\"next_item_id\\\":[10],\\\"branch_frequency\\\":72,\\\"isInjection\\\":true},{\\\"id\\\":9,\\\"order_type\\\":\\\"注射群2\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":93,\\\"frequency_of_all\\\":87,\\\"pre_item_id\\\":[7],\\\"next_item_id\\\":[11],\\\"branch_frequency\\\":27,\\\"isInjection\\\":true},{\\\"id\\\":10,\\\"order_type\\\":\\\"注射群3\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":93,\\\"frequency_of_all\\\":92,\\\"pre_item_id\\\":[8],\\\"next_item_id\\\":[12],\\\"branch_frequency\\\":72,\\\"isInjection\\\":true},{\\\"id\\\":11,\\\"order_type\\\":\\\"注射群4\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":93,\\\"frequency_of_all\\\":92,\\\"pre_item_id\\\":[9],\\\"next_item_id\\\":[12],\\\"branch_frequency\\\":27,\\\"isInjection\\\":true},{\\\"id\\\":12,\\\"order_type\\\":\\\"end\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":100,\\\"pre_item_id\\\":[10,11],\\\"next_item_id\\\":[-1]}],\\\"patient_orders\\\":[{\\\"order_type\\\":\\\"start\\\",\\\"order_explain\\\":\\\"start\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"処方\\\",\\\"order_explain\\\":\\\"内服薬剤\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"服薬指導\\\",\\\"order_explain\\\":\\\"薬剤管理指導料3\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"検体検査\\\",\\\"order_explain\\\":\\\"総蛋白\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"血液型関連検査\\\",\\\"order_explain\\\":\\\"ABO式血液型\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_explain\\\":\\\"T＆S検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"処方\\\",\\\"order_explain\\\":\\\"外用薬剤\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"手術麻酔\\\",\\\"order_explain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"手術\\\",\\\"order_explain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"緊急検査\\\",\\\"order_explain\\\":\\\"WBC\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"病理診断\\\",\\\"order_explain\\\":\\\"T-M\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"}],\\\"groups\\\":{\\\"group1\\\":[{\\\"order_type\\\":\\\"血液型関連検査\\\",\\\"order_explain\\\":\\\"ＡＢＯ式血液型\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"検体検査\\\",\\\"order_explain\\\":\\\"総蛋白\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_explain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"}],\\\"group2\\\":[{\\\"order_type\\\":\\\"検体検査\\\",\\\"order_explain\\\":\\\"総蛋白\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_explain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"}],\\\"group3\\\":[{\\\"order_type\\\":\\\"緊急検査\\\",\\\"order_explain\\\":\\\"ＷＢＣ\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"病理診断\\\",\\\"order_explain\\\":\\\"Ｔ−Ｍ\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\"}],\\\"注射群1\\\":[{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"0\\\"}],\\\"注射群2\\\":[{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"0\\\"}],\\\"注射群3\\\":[{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"1\\\"}],\\\"注射群4\\\":[{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"1\\\"}]}}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/data.json?");
+eval("module.exports = JSON.parse(\"{\\\"order_all\\\":[{\\\"id\\\":0,\\\"order_type\\\":\\\"start\\\",\\\"order_explain\\\":\\\"start\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\",\\\"frequency\\\":100,\\\"pre_item_id\\\":[-1],\\\"next_item_id\\\":[1]},{\\\"id\\\":1,\\\"order_type\\\":\\\"服薬指導\\\",\\\"order_explain\\\":\\\"薬剤管理指導料３\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\",\\\"frequency\\\":64,\\\"pre_item_id\\\":[0],\\\"next_item_id\\\":[2,3],\\\"factor\\\":[\\\"入院歴なし\\\",\\\"入院歴あり\\\"]},{\\\"id\\\":2,\\\"order_type\\\":\\\"group1\\\",\\\"order_explain\\\":\\\"血液型関連検査, 検体検査, クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"\\\",\\\"time_interval\\\":[147],\\\"pre_item_id\\\":[1],\\\"next_item_id\\\":[4],\\\"frequency\\\":86,\\\"frequency_of_all\\\":51,\\\"branch_frequency\\\":42,\\\"isGroup\\\":true},{\\\"id\\\":3,\\\"order_type\\\":\\\"group2\\\",\\\"order_explain\\\":\\\"検体検査, クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"\\\",\\\"time_interval\\\":[190],\\\"pre_item_id\\\":[1],\\\"next_item_id\\\":[4],\\\"frequency\\\":83,\\\"frequency_of_all\\\":83,\\\"branch_frequency\\\":57,\\\"isGroup\\\":true},{\\\"id\\\":4,\\\"order_type\\\":\\\"処方\\\",\\\"order_explain\\\":\\\"外用薬剤\\\",\\\"order_name\\\":\\\"グリセリン浣腸「オヲタ」\\\",\\\"code\\\":\\\"235\\\",\\\"day\\\":\\\"0\\\",\\\"time_interval\\\":[703,654],\\\"frequency\\\":90,\\\"pre_item_id\\\":[2,3],\\\"next_item_id\\\":[5]},{\\\"id\\\":5,\\\"order_type\\\":\\\"手術麻酔\\\",\\\"order_explain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\",\\\"time_interval\\\":[738],\\\"frequency\\\":71,\\\"pre_item_id\\\":[4],\\\"next_item_id\\\":[6]},{\\\"id\\\":6,\\\"order_type\\\":\\\"手術\\\",\\\"order_explain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\",\\\"time_interval\\\":[33],\\\"frequency\\\":100,\\\"pre_item_id\\\":[5],\\\"next_item_id\\\":[7]},{\\\"id\\\":7,\\\"order_type\\\":\\\"group3\\\",\\\"order_explain\\\":\\\"start\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"time_interval\\\":[93],\\\"pre_item_id\\\":[6],\\\"next_item_id\\\":[8,9],\\\"frequency\\\":81,\\\"factor\\\":[\\\"手術が13:00以前\\\",\\\"手術が13:00以降\\\"],\\\"isGroup\\\":true},{\\\"id\\\":8,\\\"order_type\\\":\\\"注射群1\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":93,\\\"frequency_of_all\\\":65,\\\"pre_item_id\\\":[7],\\\"next_item_id\\\":[10],\\\"branch_frequency\\\":72,\\\"isInjection\\\":true},{\\\"id\\\":9,\\\"order_type\\\":\\\"注射群2\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":93,\\\"frequency_of_all\\\":87,\\\"pre_item_id\\\":[7],\\\"next_item_id\\\":[11],\\\"branch_frequency\\\":27,\\\"isInjection\\\":true},{\\\"id\\\":10,\\\"order_type\\\":\\\"注射群3\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":93,\\\"frequency_of_all\\\":92,\\\"pre_item_id\\\":[8],\\\"next_item_id\\\":[12],\\\"branch_frequency\\\":72,\\\"isInjection\\\":true},{\\\"id\\\":11,\\\"order_type\\\":\\\"注射群4\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":93,\\\"frequency_of_all\\\":92,\\\"pre_item_id\\\":[9],\\\"next_item_id\\\":[12],\\\"branch_frequency\\\":27,\\\"isInjection\\\":true},{\\\"id\\\":12,\\\"order_type\\\":\\\"end\\\",\\\"order_explain\\\":\\\"\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"1\\\",\\\"frequency\\\":100,\\\"pre_item_id\\\":[10,11],\\\"next_item_id\\\":[-1]}],\\\"patient_orders\\\":[{\\\"order_type\\\":\\\"start\\\",\\\"order_explain\\\":\\\"start\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"処方\\\",\\\"order_explain\\\":\\\"内服薬剤\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"服薬指導\\\",\\\"order_explain\\\":\\\"薬剤管理指導料3\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"検体検査\\\",\\\"order_explain\\\":\\\"総蛋白\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"血液型関連検査\\\",\\\"order_explain\\\":\\\"ABO式血液型\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_explain\\\":\\\"T＆S検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"処方\\\",\\\"order_explain\\\":\\\"外用薬剤\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"手術麻酔\\\",\\\"order_explain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"手術\\\",\\\"order_explain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"緊急検査\\\",\\\"order_explain\\\":\\\"WBC\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"病理診断\\\",\\\"order_explain\\\":\\\"T-M\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"}],\\\"groups\\\":{\\\"group1\\\":[{\\\"order_type\\\":\\\"血液型関連検査\\\",\\\"order_explain\\\":\\\"ＡＢＯ式血液型\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"検体検査\\\",\\\"order_explain\\\":\\\"総蛋白\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_explain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"}],\\\"group2\\\":[{\\\"order_type\\\":\\\"検体検査\\\",\\\"order_explain\\\":\\\"総蛋白\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"},{\\\"order_type\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"order_explain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"-1\\\"}],\\\"group3\\\":[{\\\"order_type\\\":\\\"緊急検査\\\",\\\"order_explain\\\":\\\"ＷＢＣ\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"病理診断\\\",\\\"order_explain\\\":\\\"Ｔ−Ｍ\\\",\\\"order_name\\\":\\\"\\\",\\\"code\\\":\\\"\\\",\\\"day\\\":\\\"0\\\"}],\\\"注射群1\\\":[{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"0\\\"}],\\\"注射群2\\\":[{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"0\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"0\\\"}],\\\"注射群3\\\":[{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"1\\\"}],\\\"注射群4\\\":[{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"ラクテック注\\\",\\\"code\\\":\\\"331\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"1\\\"},{\\\"order_type\\\":\\\"注射\\\",\\\"order_explain\\\":\\\"静脈内注射\\\",\\\"order_name\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"code\\\":\\\"613\\\",\\\"day\\\":\\\"1\\\"}]}}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/tur-bt/data.json?");
 
 /***/ }),
 
-/***/ "./src/json/patient1.json":
-/*!********************************!*\
-  !*** ./src/json/patient1.json ***!
-  \********************************/
+/***/ "./src/json/tur-bt/patient1.json":
+/*!***************************************!*\
+  !*** ./src/json/tur-bt/patient1.json ***!
+  \***************************************/
 /*! default exports */
 /*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
 /*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
@@ -782,14 +3281,14 @@ eval("module.exports = JSON.parse(\"{\\\"order_all\\\":[{\\\"id\\\":0,\\\"order_
 /***/ ((module) => {
 
 "use strict";
-eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785828\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"プルゼニド錠１２ｍｇ\\\",\\\"nowprice\\\":\\\"5.6\\\",\\\"postprice\\\":\\\"5.6\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110603815636\\\",\\\"ordertypevalue\\\":\\\"服薬指導\\\",\\\"orderexplain\\\":\\\"薬剤管理指導料３\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1000\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785829\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1133\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785830\\\",\\\"ordertypevalue\\\":\\\"血液型関連検査\\\",\\\"orderexplain\\\":\\\"ＡＢＯ式血液型\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1133\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785831\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1133\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785836\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"外用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"グリセリン浣腸「オヲタ」６０\\\",\\\"nowprice\\\":\\\"109.7\\\",\\\"postprice\\\":\\\"114.2\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014111003854076\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"904\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014102903738131\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"930\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785843\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"1110\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785837\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1139\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110703832582\\\",\\\"ordertypevalue\\\":\\\"病理診断\\\",\\\"orderexplain\\\":\\\"Ｔ−Ｍ\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1351\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/patient1.json?");
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785828\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"プルゼニド錠１２ｍｇ\\\",\\\"nowprice\\\":\\\"5.6\\\",\\\"postprice\\\":\\\"5.6\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110603815636\\\",\\\"ordertypevalue\\\":\\\"服薬指導\\\",\\\"orderexplain\\\":\\\"薬剤管理指導料３\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1000\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785829\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1133\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785830\\\",\\\"ordertypevalue\\\":\\\"血液型関連検査\\\",\\\"orderexplain\\\":\\\"ＡＢＯ式血液型\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1133\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785831\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2014-11-06 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1133\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785836\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"外用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"グリセリン浣腸「オヲタ」６０\\\",\\\"nowprice\\\":\\\"109.7\\\",\\\"postprice\\\":\\\"114.2\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014111003854076\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"904\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014102903738131\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"930\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785843\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"1110\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110403785837\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1139\\\"},{\\\"patientid\\\":\\\"02A92CEEEEBF0ACACCF7EBD493B86313\\\",\\\"orderno\\\":\\\"O2014110703832582\\\",\\\"ordertypevalue\\\":\\\"病理診断\\\",\\\"orderexplain\\\":\\\"Ｔ−Ｍ\\\",\\\"enforcedinfodate\\\":\\\"2014-11-07 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-11-06\\\",\\\"leavehospdate\\\":\\\"2014-11-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1351\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/tur-bt/patient1.json?");
 
 /***/ }),
 
-/***/ "./src/json/patient2.json":
-/*!********************************!*\
-  !*** ./src/json/patient2.json ***!
-  \********************************/
+/***/ "./src/json/tur-bt/patient2.json":
+/*!***************************************!*\
+  !*** ./src/json/tur-bt/patient2.json ***!
+  \***************************************/
 /*! default exports */
 /*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
 /*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
@@ -949,14 +3448,14 @@ eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":
 /***/ ((module) => {
 
 "use strict";
-eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014121104137768\\\",\\\"ordertypevalue\\\":\\\"服薬指導\\\",\\\"orderexplain\\\":\\\"薬剤管理指導料３\\\",\\\"enforcedinfodate\\\":\\\"2014-12-11 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1300\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055160\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2014-12-11 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1547\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055158\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2014-12-11 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1601\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055159\\\",\\\"ordertypevalue\\\":\\\"血液型関連検査\\\",\\\"orderexplain\\\":\\\"ＡＢＯ式血液型\\\",\\\"enforcedinfodate\\\":\\\"2014-12-11 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1604\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055165\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"外用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"グリセリン浣腸「オヲタ」６０\\\",\\\"nowprice\\\":\\\"109.7\\\",\\\"postprice\\\":\\\"114.2\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055168\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"850\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014121204142733\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"851\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055167\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"930\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014121204144371\\\",\\\"ordertypevalue\\\":\\\"病理診断\\\",\\\"orderexplain\\\":\\\"Ｔ−Ｍ\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1044\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055166\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1055\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/patient2.json?");
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014121104137768\\\",\\\"ordertypevalue\\\":\\\"服薬指導\\\",\\\"orderexplain\\\":\\\"薬剤管理指導料３\\\",\\\"enforcedinfodate\\\":\\\"2014-12-11 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1300\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055160\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2014-12-11 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1547\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055158\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2014-12-11 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1601\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055159\\\",\\\"ordertypevalue\\\":\\\"血液型関連検査\\\",\\\"orderexplain\\\":\\\"ＡＢＯ式血液型\\\",\\\"enforcedinfodate\\\":\\\"2014-12-11 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1604\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055165\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"外用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"グリセリン浣腸「オヲタ」６０\\\",\\\"nowprice\\\":\\\"109.7\\\",\\\"postprice\\\":\\\"114.2\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055168\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"850\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014121204142733\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"851\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055167\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"930\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014121204144371\\\",\\\"ordertypevalue\\\":\\\"病理診断\\\",\\\"orderexplain\\\":\\\"Ｔ−Ｍ\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1044\\\"},{\\\"patientid\\\":\\\"0C5E50214FF9DE1AB2E9184E9C2E9D13\\\",\\\"orderno\\\":\\\"O2014120204055166\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2014-12-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-12-11\\\",\\\"leavehospdate\\\":\\\"2014-12-17\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1055\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/tur-bt/patient2.json?");
 
 /***/ }),
 
-/***/ "./src/json/patient3.json":
-/*!********************************!*\
-  !*** ./src/json/patient3.json ***!
-  \********************************/
+/***/ "./src/json/tur-bt/patient3.json":
+/*!***************************************!*\
+  !*** ./src/json/tur-bt/patient3.json ***!
+  \***************************************/
 /*! default exports */
 /*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
 /*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
@@ -1267,14 +3766,14 @@ eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":
 /***/ ((module) => {
 
 "use strict";
-eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061288322208\\\",\\\"ordertypevalue\\\":\\\"服薬指導\\\",\\\"orderexplain\\\":\\\"薬剤管理指導料３\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1000\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251161\\\",\\\"ordertypevalue\\\":\\\"血液型関連検査\\\",\\\"orderexplain\\\":\\\"ＡＢＯ式血液型\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1132\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251162\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1133\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251160\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1149\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061288322968\\\",\\\"ordertypevalue\\\":\\\"指導管理・文書料\\\",\\\"orderexplain\\\":\\\"肺血栓塞栓症予防管理料\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1225\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251164\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2013-06-13 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"プルゼニド錠１２ｍｇ\\\",\\\"nowprice\\\":\\\"5.6\\\",\\\"postprice\\\":\\\"5.6\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251168\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"外用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"グリセリン浣腸「オヲタ」６０\\\",\\\"nowprice\\\":\\\"109.7\\\",\\\"postprice\\\":\\\"114.2\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061288327023\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉麻\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"853\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251170\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"930\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251174\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"1009\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061488341311\\\",\\\"ordertypevalue\\\":\\\"病理診断\\\",\\\"orderexplain\\\":\\\"Ｔ−Ｍ\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1012\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251175\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"1649\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251172\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"1855\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251173\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"117\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061188309197\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＣＲＰ\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"758\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251178\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"844\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061488341728\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"950\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251177\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"1906\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061688353328\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"頓用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2013-06-16 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ムコスタ錠１００ｍｇ\\\",\\\"nowprice\\\":\\\"16.4\\\",\\\"postprice\\\":\\\"17.4\\\",\\\"efficacycode\\\":\\\"232\\\",\\\"efficacy\\\":\\\"消化性潰瘍用剤\\\",\\\"enforcedinfotime\\\":\\\"1617\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061688353328\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"頓用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2013-06-16 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ロキソニン錠６０ｍｇ\\\",\\\"nowprice\\\":\\\"17.5\\\",\\\"postprice\\\":\\\"18.6\\\",\\\"efficacycode\\\":\\\"114\\\",\\\"efficacy\\\":\\\"解熱鎮痛消炎剤\\\",\\\"enforcedinfotime\\\":\\\"1617\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/patient3.json?");
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061288322208\\\",\\\"ordertypevalue\\\":\\\"服薬指導\\\",\\\"orderexplain\\\":\\\"薬剤管理指導料３\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1000\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251161\\\",\\\"ordertypevalue\\\":\\\"血液型関連検査\\\",\\\"orderexplain\\\":\\\"ＡＢＯ式血液型\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1132\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251162\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1133\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251160\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1149\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061288322968\\\",\\\"ordertypevalue\\\":\\\"指導管理・文書料\\\",\\\"orderexplain\\\":\\\"肺血栓塞栓症予防管理料\\\",\\\"enforcedinfodate\\\":\\\"2013-06-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1225\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251164\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2013-06-13 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"プルゼニド錠１２ｍｇ\\\",\\\"nowprice\\\":\\\"5.6\\\",\\\"postprice\\\":\\\"5.6\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251168\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"外用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"グリセリン浣腸「オヲタ」６０\\\",\\\"nowprice\\\":\\\"109.7\\\",\\\"postprice\\\":\\\"114.2\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061288327023\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉麻\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"853\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251170\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"930\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251174\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"1009\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061488341311\\\",\\\"ordertypevalue\\\":\\\"病理診断\\\",\\\"orderexplain\\\":\\\"Ｔ−Ｍ\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1012\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251175\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"1649\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251172\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"1855\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251173\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"117\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061188309197\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＣＲＰ\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"758\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251178\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"844\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061488341728\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"950\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013060488251177\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2013-06-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"1906\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061688353328\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"頓用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2013-06-16 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ムコスタ錠１００ｍｇ\\\",\\\"nowprice\\\":\\\"16.4\\\",\\\"postprice\\\":\\\"17.4\\\",\\\"efficacycode\\\":\\\"232\\\",\\\"efficacy\\\":\\\"消化性潰瘍用剤\\\",\\\"enforcedinfotime\\\":\\\"1617\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2013061688353328\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"頓用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2013-06-16 00:00:00\\\",\\\"inhospdate\\\":\\\"2013-06-12\\\",\\\"leavehospdate\\\":\\\"2013-06-18\\\",\\\"productname\\\":\\\"ロキソニン錠６０ｍｇ\\\",\\\"nowprice\\\":\\\"17.5\\\",\\\"postprice\\\":\\\"18.6\\\",\\\"efficacycode\\\":\\\"114\\\",\\\"efficacy\\\":\\\"解熱鎮痛消炎剤\\\",\\\"enforcedinfotime\\\":\\\"1617\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/tur-bt/patient3.json?");
 
 /***/ }),
 
-/***/ "./src/json/patient4.json":
-/*!********************************!*\
-  !*** ./src/json/patient4.json ***!
-  \********************************/
+/***/ "./src/json/tur-bt/patient4.json":
+/*!***************************************!*\
+  !*** ./src/json/tur-bt/patient4.json ***!
+  \***************************************/
 /*! default exports */
 /*! export patient_orders [provided] [no usage info] [missing usage info prevents renaming] */
 /*!   export 0 [provided] [no usage info] [missing usage info prevents renaming] */
@@ -1615,7 +4114,7 @@ eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":
 /***/ ((module) => {
 
 "use strict";
-eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051201926559\\\",\\\"ordertypevalue\\\":\\\"服薬指導\\\",\\\"orderexplain\\\":\\\"薬剤管理指導料３\\\",\\\"enforcedinfodate\\\":\\\"2014-05-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1000\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862332\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2014-05-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1338\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862330\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2014-05-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1343\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862334\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-13 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"プルゼニド錠１２ｍｇ\\\",\\\"nowprice\\\":\\\"5.6\\\",\\\"postprice\\\":\\\"5.6\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051301951222\\\",\\\"ordertypevalue\\\":\\\"診療予約\\\",\\\"orderexplain\\\":\\\"受診\\\",\\\"enforcedinfodate\\\":\\\"2014-05-13 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1154\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862338\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"外用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"グリセリン浣腸「オヲタ」６０\\\",\\\"nowprice\\\":\\\"109.7\\\",\\\"postprice\\\":\\\"114.2\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051401978256\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"852\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201860130\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"900\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862343\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"948\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051401981783\\\",\\\"ordertypevalue\\\":\\\"病理診断\\\",\\\"orderexplain\\\":\\\"Ｔ−Ｍ\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1007\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862339\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1018\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862346\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"1743\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862342\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"1838\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051201932622\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"アレグラ錠６０ｍｇ\\\",\\\"nowprice\\\":\\\"71.9\\\",\\\"postprice\\\":\\\"75.6\\\",\\\"efficacycode\\\":\\\"449\\\",\\\"efficacy\\\":\\\"その他のアレルギー用薬\\\",\\\"enforcedinfotime\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051201932622\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"プレドニゾロン錠「タケダ」５ｍｇ\\\",\\\"nowprice\\\":\\\"9.6\\\",\\\"postprice\\\":\\\"9.6\\\",\\\"efficacycode\\\":\\\"245\\\",\\\"efficacy\\\":\\\"副腎ホルモン剤\\\",\\\"enforcedinfotime\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051201932622\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ムコスタ錠１００ｍｇ\\\",\\\"nowprice\\\":\\\"16.4\\\",\\\"postprice\\\":\\\"17.4\\\",\\\"efficacycode\\\":\\\"232\\\",\\\"efficacy\\\":\\\"消化性潰瘍用剤\\\",\\\"enforcedinfotime\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862344\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"103\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862348\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"919\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862356\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"919\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862347\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"932\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862349\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"1831\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862355\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"2100\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/patient4.json?");
+eval("module.exports = JSON.parse(\"{\\\"patient_orders\\\":[{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051201926559\\\",\\\"ordertypevalue\\\":\\\"服薬指導\\\",\\\"orderexplain\\\":\\\"薬剤管理指導料３\\\",\\\"enforcedinfodate\\\":\\\"2014-05-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1000\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862332\\\",\\\"ordertypevalue\\\":\\\"クロスマッチ（Ｔ＆Ｓ）検査\\\",\\\"orderexplain\\\":\\\"Ｔ＆Ｓ検査\\\",\\\"enforcedinfodate\\\":\\\"2014-05-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1338\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862330\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2014-05-12 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1343\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862334\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-13 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"プルゼニド錠１２ｍｇ\\\",\\\"nowprice\\\":\\\"5.6\\\",\\\"postprice\\\":\\\"5.6\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051301951222\\\",\\\"ordertypevalue\\\":\\\"診療予約\\\",\\\"orderexplain\\\":\\\"受診\\\",\\\"enforcedinfodate\\\":\\\"2014-05-13 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1154\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862338\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"外用薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"グリセリン浣腸「オヲタ」６０\\\",\\\"nowprice\\\":\\\"109.7\\\",\\\"postprice\\\":\\\"114.2\\\",\\\"efficacycode\\\":\\\"235\\\",\\\"efficacy\\\":\\\"下剤\\\",\\\"enforcedinfotime\\\":\\\"浣腸剤\\\",\\\"undefined\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051401978256\\\",\\\"ordertypevalue\\\":\\\"手術麻酔\\\",\\\"orderexplain\\\":\\\"閉鎖循環式全身麻酔\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"852\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201860130\\\",\\\"ordertypevalue\\\":\\\"手術\\\",\\\"orderexplain\\\":\\\"膀胱悪性腫瘍手術\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"900\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862343\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"948\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051401981783\\\",\\\"ordertypevalue\\\":\\\"病理診断\\\",\\\"orderexplain\\\":\\\"Ｔ−Ｍ\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1007\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862339\\\",\\\"ordertypevalue\\\":\\\"緊急検査\\\",\\\"orderexplain\\\":\\\"ＷＢＣ\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"1018\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862346\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"1743\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862342\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-14 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"1838\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051201932622\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"アレグラ錠６０ｍｇ\\\",\\\"nowprice\\\":\\\"71.9\\\",\\\"postprice\\\":\\\"75.6\\\",\\\"efficacycode\\\":\\\"449\\\",\\\"efficacy\\\":\\\"その他のアレルギー用薬\\\",\\\"enforcedinfotime\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051201932622\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"プレドニゾロン錠「タケダ」５ｍｇ\\\",\\\"nowprice\\\":\\\"9.6\\\",\\\"postprice\\\":\\\"9.6\\\",\\\"efficacycode\\\":\\\"245\\\",\\\"efficacy\\\":\\\"副腎ホルモン剤\\\",\\\"enforcedinfotime\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014051201932622\\\",\\\"ordertypevalue\\\":\\\"処方\\\",\\\"orderexplain\\\":\\\"内服薬剤\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ムコスタ錠１００ｍｇ\\\",\\\"nowprice\\\":\\\"16.4\\\",\\\"postprice\\\":\\\"17.4\\\",\\\"efficacycode\\\":\\\"232\\\",\\\"efficacy\\\":\\\"消化性潰瘍用剤\\\",\\\"enforcedinfotime\\\":\\\"10\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862344\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"103\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862348\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"919\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862356\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"919\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862347\\\",\\\"ordertypevalue\\\":\\\"検体検査\\\",\\\"orderexplain\\\":\\\"総蛋白\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"\\\",\\\"nowprice\\\":\\\"\\\",\\\"postprice\\\":\\\"\\\",\\\"efficacycode\\\":\\\"\\\",\\\"efficacy\\\":\\\"\\\",\\\"enforcedinfotime\\\":\\\"932\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862349\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」\\\",\\\"nowprice\\\":\\\"609\\\",\\\"postprice\\\":\\\"659\\\",\\\"efficacycode\\\":\\\"613\\\",\\\"efficacy\\\":\\\"主としてグラム陽性・陰性菌に作用するもの\\\",\\\"enforcedinfotime\\\":\\\"1831\\\"},{\\\"patientid\\\":\\\"03F922290E7E2B14D9B224F6451227A1\\\",\\\"orderno\\\":\\\"O2014050201862355\\\",\\\"ordertypevalue\\\":\\\"注射\\\",\\\"orderexplain\\\":\\\"静脈内注射\\\",\\\"enforcedinfodate\\\":\\\"2014-05-15 00:00:00\\\",\\\"inhospdate\\\":\\\"2014-05-12\\\",\\\"leavehospdate\\\":\\\"2014-05-16\\\",\\\"productname\\\":\\\"ラクテック注\\\",\\\"nowprice\\\":\\\"155\\\",\\\"postprice\\\":\\\"155\\\",\\\"efficacycode\\\":\\\"331\\\",\\\"efficacy\\\":\\\"血液代用剤\\\",\\\"enforcedinfotime\\\":\\\"2100\\\"}]}\");\n\n//# sourceURL=webpack://Visualization_webpack/./src/json/tur-bt/patient4.json?");
 
 /***/ })
 
