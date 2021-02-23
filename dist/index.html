@@ -2,11 +2,8 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>診療指示列可視化</title>
+    <title>sample</title>
     <style>
-      body {
-        margin: 20px;
-      }
       .node0 rect {
         cursor: move;
         fill-opacity: 0.9;
@@ -58,43 +55,17 @@
   </head>
   <body>
     <script>
-      const url = new URL(location.href);
       const onClick = () => {
-        const form = document.getElementById("input_patient_id");
+        const form = document.getElementById("input_message");
         const patient_id = form.value;
 
         const url = new URL(location.href);
         url.searchParams.set("patient", patient_id);
         location.href = url;
       };
-      const onChange = () => {
-        const form = document.getElementById("input_clinical_case");
-        const clinical_case = form.value;
-
-        const url = new URL(location.href);
-        url.searchParams.set("type", clinical_case);
-        location.href = url;
-      };
     </script>
     <p id="chart"></p>
-    <h2>診療指示列可視化</h2>
-    <form action="#" id="form">
-      <label for="input_clinical_case">症例</label>
-      <select name="" id="input_clinical_case" onchange="onChange()">
-        <option value="tur-bt">TUR-Bt</option>
-        <option value="rfa">RFA</option>
-        <option value="hepatectomy">肝切除</option>
-      </select>
-    </form>
-    <form action="#" id="form">
-      <label for="input_patient_id">患者ID</label>
-      <input type="text" id="input_patient_id" value="" />
-      <input type="button" onclick="onClick()" value="送信" />
-    </form>
-    <button id="changeFrequency">分岐に対応する患者中の出現率を表示</button>
-
-    <div id="clinicalpath"></div>
-    <div id="patientpath"></div>
+    <h2>Clinical Pathways</h2>
     <h3>説明</h3>
     <!-- <p>オーダーダブルクリック : 詳細情報の表示</p> -->
     <p>オーダークリック : 詳細情報の非表示/非表示</p>
@@ -102,6 +73,11 @@
     <p>
       水色のパスは患者の医療指示履歴と合致したパスを、紫色のパスは次に行うべき医療指示を示す
     </p>
+    <form action="#" id="form">
+      <label for="input_message">患者ID</label>
+      <input type="text" id="input_message" value="" />
+      <input type="button" onclick="onClick()" value="送信" />
+    </form>
     <!-- <p>安全性</p>
     <button id="displayRisk1">併発症発生リスク</button>
     <button id="displayRisk2">重篤度を考慮したリスク</button>
@@ -110,7 +86,8 @@
     <button id="displayCost2">費用</button>
     <p><button id="clearButton">全ての詳細情報の非表示</button></p> -->
     <!-- <button id="changeRecommend">推薦OFF</button> -->
+    <button id="changeFrequency">分岐に対応する患者中の出現率を表示</button>
     <!-- <div id="buttons"></div> -->
     <!-- <script src="index.js"></script> -->
-  </body>
+  <script src="/main.js"></script></body>
 </html>

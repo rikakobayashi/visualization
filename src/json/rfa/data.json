@@ -1,0 +1,129 @@
+{
+  "order_all": [
+    {
+      "id": 0,
+      "order_type": "start",
+      "order_explain": "start",
+      "order_name": "",
+      "code": "",
+      "day": "-5",
+      "frequency": 100,
+      "pre_item_id": [-1],
+      "next_item_id": [1]
+    },
+    {
+      "id": 1,
+      "order_type": "負荷試験",
+      "order_explain": "ＩＣＧ前",
+      "order_name": "",
+      "code": "",
+      "day": "-5",
+      "frequency": 56,
+      "pre_item_id": [0],
+      "next_item_id": [2]
+    },
+    {
+      "id": 2,
+      "order_type": "ＣＴ",
+      "order_explain": "腹部",
+      "order_name": "",
+      "code": "",
+      "day": "",
+      "time_interval": [1194],
+      "pre_item_id": [1],
+      "next_item_id": [3],
+      "frequency": 83
+    },
+    {
+      "id": 3,
+      "order_type": "自科生理検査",
+      "order_explain": "超音波検査（断層撮影法）（胸腹部）",
+      "order_name": "",
+      "code": "",
+      "day": "-3",
+      "time_interval": [281],
+      "pre_item_id": [2],
+      "next_item_id": [4],
+      "frequency": 97
+    },
+    {
+      "id": 4,
+      "order_type": "クロスマッチ（Ｔ＆Ｓ）検査",
+      "order_explain": "Ｔ＆Ｓ検査",
+      "order_name": "グリセリン浣腸「オヲタ」",
+      "code": "235",
+      "day": "0",
+      "time_interval": [3863],
+      "frequency": 97,
+      "pre_item_id": [3],
+      "next_item_id": [5]
+    },
+    {
+      "id": 5,
+      "order_type": "処置",
+      "order_explain": "RFA",
+      "order_name": "",
+      "code": "",
+      "day": "0",
+      "time_interval": [603],
+      "frequency": 100,
+      "pre_item_id": [4],
+      "next_item_id": [6]
+    },
+    {
+      "id": 6,
+      "order_type": "group1",
+      "order_explain": "膀胱悪性腫瘍手術",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "time_interval": [662],
+      "frequency": 74,
+      "pre_item_id": [5],
+      "next_item_id": [7],
+      "isGroup": true
+    },
+    {
+      "id": 7,
+      "order_type": "ＣＴ",
+      "order_explain": "腹部",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "time_interval": [391],
+      "pre_item_id": [6],
+      "next_item_id": [8],
+      "frequency": 77
+    },
+    {
+      "id": 8,
+      "order_type": "end",
+      "order_explain": "end",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "frequency": 93,
+      "frequency_of_all": 65,
+      "pre_item_id": [7],
+      "next_item_id": [-1]
+    }
+  ],
+  "groups": {
+    "group1": [
+      {
+        "order_type": "自科生理検査",
+        "order_explain": "超音波検査（断層撮影法）（胸腹部）",
+        "order_name": "",
+        "code": "",
+        "day": "1"
+      },
+      {
+        "order_type": "検体検査",
+        "order_explain": "総ビリルビン",
+        "order_name": "",
+        "code": "",
+        "day": "1"
+      }
+    ]
+  }
+}

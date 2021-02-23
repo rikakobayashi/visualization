@@ -1,0 +1,430 @@
+{
+  "order_all": [
+    {
+      "id": 0,
+      "order_type": "start",
+      "order_explain": "start",
+      "order_name": "",
+      "code": "",
+      "day": "-1",
+      "frequency": 100,
+      "pre_item_id": [-1],
+      "next_item_id": [1]
+    },
+    {
+      "id": 1,
+      "order_type": "服薬指導",
+      "order_explain": "薬剤管理指導料３",
+      "order_name": "",
+      "code": "",
+      "day": "-1",
+      "frequency": 64,
+      "pre_item_id": [0],
+      "next_item_id": [2, 3],
+      "factor": ["入院歴なし", "入院歴あり"]
+    },
+    {
+      "id": 2,
+      "order_type": "group1",
+      "order_explain": "血液型関連検査, 検体検査, クロスマッチ（Ｔ＆Ｓ）検査",
+      "order_name": "",
+      "code": "",
+      "day": "",
+      "time_interval": [147],
+      "pre_item_id": [1],
+      "next_item_id": [4],
+      "frequency": 86,
+      "frequency_of_all": 51,
+      "branch_frequency": 42,
+      "isGroup": true
+    },
+    {
+      "id": 3,
+      "order_type": "group2",
+      "order_explain": "検体検査, クロスマッチ（Ｔ＆Ｓ）検査",
+      "order_name": "",
+      "code": "",
+      "day": "",
+      "time_interval": [190],
+      "pre_item_id": [1],
+      "next_item_id": [4],
+      "frequency": 83,
+      "frequency_of_all": 83,
+      "branch_frequency": 57,
+      "isGroup": true
+    },
+    {
+      "id": 4,
+      "order_type": "処方",
+      "order_explain": "外用薬剤",
+      "order_name": "グリセリン浣腸「オヲタ」",
+      "code": "235",
+      "day": "0",
+      "time_interval": [703, 654],
+      "frequency": 90,
+      "pre_item_id": [2, 3],
+      "next_item_id": [5]
+    },
+    {
+      "id": 5,
+      "order_type": "手術麻酔",
+      "order_explain": "閉鎖循環式全身麻酔",
+      "order_name": "",
+      "code": "",
+      "day": "0",
+      "time_interval": [738],
+      "frequency": 71,
+      "pre_item_id": [4],
+      "next_item_id": [6]
+    },
+    {
+      "id": 6,
+      "order_type": "手術",
+      "order_explain": "膀胱悪性腫瘍手術",
+      "order_name": "",
+      "code": "",
+      "day": "0",
+      "time_interval": [33],
+      "frequency": 100,
+      "pre_item_id": [5],
+      "next_item_id": [7]
+    },
+    {
+      "id": 7,
+      "order_type": "group3",
+      "order_explain": "start",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "time_interval": [93],
+      "pre_item_id": [6],
+      "next_item_id": [8, 9],
+      "frequency": 81,
+      "factor": ["手術が13:00以前", "手術が13:00以降"],
+      "isGroup": true
+    },
+    {
+      "id": 8,
+      "order_type": "注射群1",
+      "order_explain": "",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "frequency": 93,
+      "frequency_of_all": 65,
+      "pre_item_id": [7],
+      "next_item_id": [10],
+      "branch_frequency": 72,
+      "isInjection": true
+    },
+    {
+      "id": 9,
+      "order_type": "注射群2",
+      "order_explain": "",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "frequency": 93,
+      "frequency_of_all": 87,
+      "pre_item_id": [7],
+      "next_item_id": [11],
+      "branch_frequency": 27,
+      "isInjection": true
+    },
+    {
+      "id": 10,
+      "order_type": "注射群3",
+      "order_explain": "",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "frequency": 93,
+      "frequency_of_all": 92,
+      "pre_item_id": [8],
+      "next_item_id": [12],
+      "branch_frequency": 72,
+      "isInjection": true
+    },
+    {
+      "id": 11,
+      "order_type": "注射群4",
+      "order_explain": "",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "frequency": 93,
+      "frequency_of_all": 92,
+      "pre_item_id": [9],
+      "next_item_id": [12],
+      "branch_frequency": 27,
+      "isInjection": true
+    },
+    {
+      "id": 12,
+      "order_type": "end",
+      "order_explain": "",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "frequency": 100,
+      "pre_item_id": [10, 11],
+      "next_item_id": [-1]
+    }
+  ],
+  "patient_orders": [
+    {
+      "order_type": "start",
+      "order_explain": "start",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "処方",
+      "order_explain": "内服薬剤",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "服薬指導",
+      "order_explain": "薬剤管理指導料3",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "検体検査",
+      "order_explain": "総蛋白",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "血液型関連検査",
+      "order_explain": "ABO式血液型",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "クロスマッチ（Ｔ＆Ｓ）検査",
+      "order_explain": "T＆S検査",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "処方",
+      "order_explain": "外用薬剤",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "手術麻酔",
+      "order_explain": "閉鎖循環式全身麻酔",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "手術",
+      "order_explain": "膀胱悪性腫瘍手術",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "注射",
+      "order_explain": "静脈内注射",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "緊急検査",
+      "order_explain": "WBC",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    },
+    {
+      "order_type": "病理診断",
+      "order_explain": "T-M",
+      "order_name": "",
+      "code": "",
+      "day": "-1"
+    }
+  ],
+  "groups": {
+    "group1": [
+      {
+        "order_type": "血液型関連検査",
+        "order_explain": "ＡＢＯ式血液型",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      },
+      {
+        "order_type": "検体検査",
+        "order_explain": "総蛋白",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      },
+      {
+        "order_type": "クロスマッチ（Ｔ＆Ｓ）検査",
+        "order_explain": "Ｔ＆Ｓ検査",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      }
+    ],
+    "group2": [
+      {
+        "order_type": "検体検査",
+        "order_explain": "総蛋白",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      },
+      {
+        "order_type": "クロスマッチ（Ｔ＆Ｓ）検査",
+        "order_explain": "Ｔ＆Ｓ検査",
+        "order_name": "",
+        "code": "",
+        "day": "-1"
+      }
+    ],
+    "group3": [
+      {
+        "order_type": "緊急検査",
+        "order_explain": "ＷＢＣ",
+        "order_name": "",
+        "code": "",
+        "day": "0"
+      },
+      {
+        "order_type": "病理診断",
+        "order_explain": "Ｔ−Ｍ",
+        "order_name": "",
+        "code": "",
+        "day": "0"
+      }
+    ],
+    "注射群1": [
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "ラクテック注",
+        "code": "331",
+        "day": "0"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "ラクテック注",
+        "code": "331",
+        "day": "0"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」",
+        "code": "613",
+        "day": "0"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」",
+        "code": "613",
+        "day": "0"
+      }
+    ],
+    "注射群2": [
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "ラクテック注",
+        "code": "331",
+        "day": "0"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "ラクテック注",
+        "code": "331",
+        "day": "0"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」",
+        "code": "613",
+        "day": "0"
+      }
+    ],
+    "注射群3": [
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "ラクテック注",
+        "code": "331",
+        "day": "1"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "ラクテック注",
+        "code": "331",
+        "day": "1"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」",
+        "code": "613",
+        "day": "1"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」",
+        "code": "613",
+        "day": "1"
+      }
+    ],
+    "注射群4": [
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "ラクテック注",
+        "code": "331",
+        "day": "1"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "ラクテック注",
+        "code": "331",
+        "day": "1"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」",
+        "code": "613",
+        "day": "1"
+      },
+      {
+        "order_type": "注射",
+        "order_explain": "静脈内注射",
+        "order_name": "セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」",
+        "code": "613",
+        "day": "1"
+      }
+    ]
+  }
+}

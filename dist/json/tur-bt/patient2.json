@@ -150,66 +150,6 @@
       "efficacycode": "",
       "efficacy": "",
       "enforcedinfotime": "1055"
-    },
-    {
-      "patientid": "0C5E50214FF9DE1AB2E9184E9C2E9D13",
-      "orderno": "O2014121104131080",
-      "ordertypevalue": "注射",
-      "orderexplain": "膀胱洗浄及び膀胱内薬液注入",
-      "enforcedinfodate": "2014-12-12 00:00:00",
-      "inhospdate": "2014-12-11",
-      "leavehospdate": "2014-12-17",
-      "productname": "大塚糖液５％",
-      "nowprice": "65",
-      "postprice": "64",
-      "efficacycode": "323",
-      "efficacy": "糖類剤",
-      "enforcedinfotime": "1441"
-    },
-    {
-      "patientid": "0C5E50214FF9DE1AB2E9184E9C2E9D13",
-      "orderno": "O2014120204055171",
-      "ordertypevalue": "注射",
-      "orderexplain": "静脈内注射",
-      "enforcedinfodate": "2014-12-12 00:00:00",
-      "inhospdate": "2014-12-11",
-      "leavehospdate": "2014-12-17",
-      "productname": "ラクテック注",
-      "nowprice": "155",
-      "postprice": "155",
-      "efficacycode": "331",
-      "efficacy": "血液代用剤",
-      "enforcedinfotime": "2304"
-    },
-    {
-      "patientid": "0C5E50214FF9DE1AB2E9184E9C2E9D13",
-      "orderno": "O2014120204055174",
-      "ordertypevalue": "注射",
-      "orderexplain": "静脈内注射",
-      "enforcedinfodate": "2014-12-13 00:00:00",
-      "inhospdate": "2014-12-11",
-      "leavehospdate": "2014-12-17",
-      "productname": "セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」",
-      "nowprice": "609",
-      "postprice": "659",
-      "efficacycode": "613",
-      "efficacy": "主としてグラム陽性・陰性菌に作用するもの",
-      "enforcedinfotime": "941"
-    },
-    {
-      "patientid": "0C5E50214FF9DE1AB2E9184E9C2E9D13",
-      "orderno": "O2014120204055175",
-      "ordertypevalue": "注射",
-      "orderexplain": "静脈内注射",
-      "enforcedinfodate": "2014-12-13 00:00:00",
-      "inhospdate": "2014-12-11",
-      "leavehospdate": "2014-12-17",
-      "productname": "セファゾリンＮａ点滴静注用１ｇバッグ「オーツカ」",
-      "nowprice": "609",
-      "postprice": "659",
-      "efficacycode": "613",
-      "efficacy": "主としてグラム陽性・陰性菌に作用するもの",
-      "enforcedinfotime": "1945"
     }
   ]
 }

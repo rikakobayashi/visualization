@@ -1,0 +1,135 @@
+{
+  "order_all": [
+    {
+      "id": 0,
+      "order_type": "start",
+      "order_explain": "start",
+      "order_name": "",
+      "code": "",
+      "day": "-4",
+      "frequency": 100,
+      "pre_item_id": [-1],
+      "next_item_id": [1]
+    },
+    {
+      "id": 1,
+      "order_type": "group1",
+      "order_explain": "Ｔ＆Ｓ検査",
+      "order_name": "",
+      "code": "",
+      "day": "-3",
+      "frequency": 56,
+      "pre_item_id": [0],
+      "next_item_id": [2],
+      "isGroup": true
+    },
+    {
+      "id": 2,
+      "order_type": "クロスマッチ（Ｔ＆Ｓ）検査",
+      "order_explain": "Ｔ＆Ｓ検査",
+      "order_name": "",
+      "code": "",
+      "day": "-1",
+      "time_interval": [2550],
+      "pre_item_id": [1],
+      "next_item_id": [3],
+      "frequency": 83
+    },
+    {
+      "id": 3,
+      "order_type": "手術麻酔",
+      "order_explain": "閉鎖循環式全身麻酔（重症以外）",
+      "order_name": "",
+      "code": "",
+      "day": "-3",
+      "time_interval": [1143],
+      "pre_item_id": [2],
+      "next_item_id": [4],
+      "frequency": 97
+    },
+    {
+      "id": 4,
+      "order_type": "手術",
+      "order_explain": "肝切除術",
+      "order_name": "",
+      "code": "",
+      "day": "0",
+      "time_interval": [33],
+      "frequency": 97,
+      "pre_item_id": [3],
+      "next_item_id": [5]
+    },
+    {
+      "id": 5,
+      "order_type": "放射線単純",
+      "order_explain": "単純－胸腹部",
+      "order_name": "",
+      "code": "",
+      "day": "1",
+      "time_interval": [2043],
+      "frequency": 100,
+      "pre_item_id": [4],
+      "next_item_id": [6]
+    },
+    {
+      "id": 6,
+      "order_type": "放射線単純",
+      "order_explain": "単純－胸腹部",
+      "order_name": "",
+      "code": "",
+      "day": "2",
+      "time_interval": [1450],
+      "frequency": 74,
+      "pre_item_id": [5],
+      "next_item_id": [7]
+    },
+    {
+      "id": 7,
+      "order_type": "放射線単純",
+      "order_explain": "単純－胸腹部",
+      "order_name": "",
+      "code": "",
+      "day": "3",
+      "time_interval": [1446],
+      "pre_item_id": [6],
+      "next_item_id": [8],
+      "frequency": 77
+    },
+    {
+      "id": 8,
+      "order_type": "end",
+      "order_explain": "end",
+      "order_name": "",
+      "code": "",
+      "day": "3",
+      "frequency": 93,
+      "pre_item_id": [7],
+      "next_item_id": [-1]
+    }
+  ],
+  "groups": {
+    "group1": [
+      {
+        "order_type": "放射線単純",
+        "order_explain": "単純－胸腹部",
+        "order_name": "",
+        "code": "",
+        "day": "-3"
+      },
+      {
+        "order_type": "負荷試験",
+        "order_explain": "ＩＣＧ前",
+        "order_name": "",
+        "code": "",
+        "day": "-3"
+      },
+      {
+        "order_type": "検体検査",
+        "order_explain": "総蛋白",
+        "order_name": "",
+        "code": "",
+        "day": "-3"
+      }
+    ]
+  }
+}
