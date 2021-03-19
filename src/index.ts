@@ -3,18 +3,8 @@ import * as d3 from "d3";
 import { sankey, sankeyLinkHorizontal } from "d3-sankey";
 import turBt from "./json/tur-bt/data.json";
 import turBtpatientData1 from "./json/tur-bt/patient1.json";
-import turBtpatientData2 from "./json/tur-bt/patient2.json";
-import turBtpatientData3 from "./json/tur-bt/patient3.json";
-import turBtpatientData4 from "./json/tur-bt/patient4.json";
-import rfa from "./json/rfa/data.json";
-import rfaPatientData1 from "./json/rfa/patient1.json";
-import rfaPatientData2 from "./json/rfa/patient2.json";
-import rfaPatientData3 from "./json/rfa/patient3.json";
-import hepatectomy from "./json/hepatectomy/data.json";
-import hepatectomyPatientData1 from "./json/hepatectomy/patient1.json";
-import hepatectomyPatientData2 from "./json/hepatectomy/patient2.json";
-import hepatectomyPatientData3 from "./json/hepatectomy/patient3.json";
 import { parse } from "querystring";
+import filesData from "./json/files.json";
 
 interface JSONDataType {
   order_all: OrderDataType[];
@@ -93,46 +83,63 @@ interface LinksType {
 
 const params = parse(location.search.substring(1));
 
-const data: JSONDataType =
-  params.type === "tur-bt"
-    ? turBt
-    : params.type === "rfa"
-    ? rfa
-    : params.type === "hepatectomy"
-    ? hepatectomy
-    : turBt;
+const caseSelect = document.getElementById("input_clinical_case");
+const patientSelect = document.getElementById("input_patient_id");
 
-const patientData =
-  params.type === "tur-bt"
-    ? params.patient === "1"
-      ? turBtpatientData1
-      : params.patient === "2"
-      ? turBtpatientData2
-      : params.patient === "3"
-      ? turBtpatientData3
-      : params.patient === "4"
-      ? turBtpatientData4
-      : null
-    : params.type === "rfa"
-    ? params.patient === "1"
-      ? rfaPatientData1
-      : params.patient === "2"
-      ? rfaPatientData2
-      : params.patient === "3"
-      ? rfaPatientData3
-      : null
-    : params.type === "hepatectomy"
-    ? params.patient === "1"
-      ? hepatectomyPatientData1
-      : params.patient === "2"
-      ? hepatectomyPatientData2
-      : params.patient === "3"
-      ? hepatectomyPatientData3
-      : null
-    : null;
+const caseName = params.type || Object.keys(filesData)[0];
+const caseData = filesData[caseName];
+const patientId = params.patient;
 
-const PatientData: PatientOrderDataType[] | undefined =
-  patientData?.patient_orders;
+for (let key in filesData) {
+  const caseData = filesData[key];
+  const caseOption = document.createElement("option");
+  caseOption.text = caseData.name;
+  caseOption.value = key;
+  caseSelect?.appendChild(caseOption);
+}
+
+const patientsData = filesData[caseName].patients;
+for (let key in patientsData) {
+  const patientData = patientsData[key];
+  const patientOption = document.createElement("option");
+  patientOption.text = key;
+  patientOption.value = key;
+  patientSelect?.appendChild(patientOption);
+}
+const selectFormForType: HTMLSelectElement = <HTMLSelectElement>(
+  document!.getElementById("input_clinical_case")
+);
+Array.prototype.forEach.call(selectFormForType.options, (option) => {
+  if (option.value === params.type) {
+    option.selected = true;
+  }
+});
+
+const selectFormForPatient: HTMLSelectElement = <HTMLSelectElement>(
+  document!.getElementById("input_patient_id")
+);
+Array.prototype.forEach.call(selectFormForPatient.options, (option) => {
+  if (option.value === params.patient) {
+    option.selected = true;
+  }
+});
+
+let data: JSONDataType = turBt;
+const spmDataPath = [".", caseData.basepath, caseData.spm].join("/");
+const context = require.context("./json", true, /\.json$/);
+data = context(spmDataPath);
+
+let PatientData: PatientOrderDataType[] | null = turBtpatientData1;
+const patientDataPath = [
+  ".",
+  caseData.basepath,
+  caseData.patients[patientId],
+].join("/");
+try {
+  PatientData = context(patientDataPath);
+} catch (e) {
+  PatientData = null;
+}
 
 // d3.json("./json/data.json", function (error, data: JSONDataType) {
 const N1 = 8;
@@ -292,7 +299,6 @@ data.order_all.forEach((orders_by_seq, seq_index) => {
   if (orders_by_seq.next_item_id[0] !== -1) {
     // linksを定義
     orders_by_seq.next_item_id.forEach((id, index) => {
-      console.log(find_order_by_id(id)?.pre_item_id.indexOf(orders_by_seq.id));
       graph.links.push({
         source: orders_by_seq.id,
         target: id,
@@ -376,14 +382,6 @@ const getAllPathId = (id: number, arr: number[]) => {
 
 getAllPathId(0, []);
 
-console.log(allPathId.concat());
-
-console.log(JSON.parse(JSON.stringify(graph)));
-console.log(JSON.parse(JSON.stringify(place)));
-
-console.log(JSON.parse(JSON.stringify(graph2)));
-console.log(JSON.parse(JSON.stringify(place2)));
-
 const patientPath = [];
 let i = 0;
 let j = 0;
@@ -421,8 +419,6 @@ if (PatientData) {
   }
 }
 
-console.log(patientPath.concat());
-
 function getAllPathName(
   path_id_array: Array<number>
 ): Array<string | string[]> {
@@ -450,8 +446,6 @@ const passedPath = allPathId.reduce(
   },
   [] as Array<number>
 );
-
-console.log(passedPath);
 
 function getConcordance(
   all_path_array: Array<number>,
@@ -484,7 +478,6 @@ function getMatchPath(
         JSON.stringify(path_name.sort()) ==
         JSON.stringify(group_order.map((order) => order.ordertypevalue).sort())
       ) {
-        console.log(path_name);
         matchedPath.push(path_id_array[_j]);
         _i += path_name.length;
         _j++;
@@ -508,7 +501,6 @@ function getMatchPath(
         matchedPath.push(path_id_array[_j]);
         _i++;
         _j++;
-        console.log(path_name);
         continue;
       } else if (
         // 頻出パスが多い、患者のパスが飛んでいる
@@ -543,8 +535,6 @@ function getMatchPath(
 }
 
 const matchedPath = PatientData ? getMatchPath(passedPath, PatientData) : [];
-
-console.log(matchedPath);
 
 //Set up the color scale
 const color = d3.scale.category20();
@@ -1148,7 +1138,6 @@ matchedPath.forEach((p, i) => {
   d3.select(`#link${p}-${matchedPath[i + 1]}`).attr("stroke", "#bce2e8");
 });
 
-console.log(variants);
 const factors: LinksType[] = [];
 
 d3.select("#changeFrequency").on("click", function (button: EventTarget) {

@@ -58,16 +58,20 @@
   </head>
   <body>
     <script>
-      const url = new URL(location.href);
       const onClick = () => {
         const form = document.getElementById("input_patient_id");
         const patient_id = form.value;
 
         const url = new URL(location.href);
-        url.searchParams.set("patient", patient_id);
+        if (patient_id === "null") {
+          url.searchParams.delete("patient");
+        } else {
+          url.searchParams.set("patient", patient_id);
+        }
         location.href = url;
       };
       const onChange = () => {
+        console.log("a");
         const form = document.getElementById("input_clinical_case");
         const clinical_case = form.value;
 
@@ -76,6 +80,7 @@
         location.href = url;
       };
     </script>
+
     <p id="chart"></p>
     <h2>診療指示列可視化</h2>
     <form action="#" id="form">
@@ -88,8 +93,14 @@
     </form>
     <form action="#" id="form">
       <label for="input_patient_id">患者ID</label>
-      <input type="text" id="input_patient_id" value="" />
-      <input type="button" onclick="onClick()" value="送信" />
+      <!-- <input type="text" id="input_patient_id" value="" />
+      <input type="button" onclick="onClick()" value="送信" /> -->
+      <select name="" id="input_patient_id" onchange="onClick()">
+        <option value="null">なし</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+      </select>
     </form>
     <button id="changeFrequency">分岐に対応する患者中の出現率を表示</button>
 

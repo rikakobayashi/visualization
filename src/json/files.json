@@ -1,0 +1,32 @@
+{
+  "tur-bt": {
+    "name": "TUR-Bt",
+    "basepath": "tur-bt",
+    "spm": "data.json",
+    "patients": {
+      "1": "patient1.json",
+      "2": "patient2.json",
+      "3": "patient4.json"
+    }
+  },
+  "rfa": {
+    "name": "RFA",
+    "basepath": "rfa",
+    "spm": "data.json",
+    "patients": {
+      "1": "patient1.json",
+      "2": "patient2.json",
+      "3": "patient3.json"
+    }
+  },
+  "hepatectomy": {
+    "name": "肝切除",
+    "basepath": "hepatectomy",
+    "spm": "data.json",
+    "patients": {
+      "1": "patient1.json",
+      "2": "patient2.json",
+      "3": "patient3.json"
+    }
+  }
+}
